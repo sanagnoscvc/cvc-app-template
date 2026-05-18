@@ -71,6 +71,17 @@ Either way, the script blocks the commit until `.patterns-checked` exists. You p
 4. Do not change the git hooks that are in place without the user's explicit instruction.
 5. You are responsible for fixing **ALL** issues discovered during commit checks — even if they exist in files you didn't modify or are unrelated to the work done in the current session. The goal is always a clean commit.
 
+## Running from the GitHub Action
+
+`.github/workflows/claude.yml` wires up the Claude GitHub Action. When triggered by `@claude` in an issue or PR (or by an issue being opened/assigned), you run on a CI runner, commit to a `claude/...` branch, and open a PR back.
+
+When running via the Action:
+
+- The same hooks contract applies. Pre-commit will run on your commits. Don't `--no-verify`.
+- If `.git/hooks/pre-commit` isn't installed in the runner's checkout (it usually isn't, since hooks aren't versioned), wire it up first: `pre-commit install` (if `pre-commit` framework) or `npx husky` (if husky). The flavor skills set this up automatically when the user calls them.
+- For question-shaped tasks (no code change needed), just comment back on the issue instead of opening a PR.
+- Surface decisions in the PR description, not as silent assumptions in code.
+
 ## What NOT to do
 
 - **Don't soften the hooks contract** to make commits faster. Lower bars for "convenience" defeat the purpose.

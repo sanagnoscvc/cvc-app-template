@@ -11,6 +11,7 @@ A **stack-agnostic Claude harness**. No pre-installed tooling, no framework assu
 - **The `check-patterns` Claude skill** — encoded review pass Claude runs before each commit to flag duplicated logic and defensive shims
 - **The `check-patterns.sh` gate script** — blocks commits until the audit has run (paired with whatever pre-commit framework Claude wires up for your stack)
 - **Flavor bootstrap skills** — `setup-ts-flavor` and `setup-python-flavor` encode the deterministic install + config steps for each language family, so Claude doesn't re-derive them every time
+- **Claude GitHub Action** (`.github/workflows/claude.yml`) — `@claude` in any issue or PR comment runs Claude on a CI runner: it commits to a `claude/...` branch and opens a PR back
 - **`CLAUDE.md`** — Claude's constitution for working in CVC apps. Defines the **hooks contract** (what every commit must be gated on) and points Claude at the right flavor skill per stack
 - **A multi-language `.gitignore`** baseline
 
@@ -65,14 +66,37 @@ This forces every commit through a quality pass without requiring you to remembe
 ```
 cvc-app-template/
 ├── .gitignore                            ← multi-language defaults
+├── .github/workflows/
+│   └── claude.yml                        ← Claude GitHub Action — @claude in issues/PRs
 ├── scripts/
 │   └── check-patterns.sh                 ← gate script (blocks commit until stamp exists)
 ├── .claude/
-│   ├── skills/check-patterns/SKILL.md    ← the audit skill
+│   ├── skills/
+│   │   ├── check-patterns/SKILL.md       ← the pre-commit audit skill
+│   │   ├── setup-ts-flavor/SKILL.md      ← TS/JS bootstrap (husky + lint-staged + eslint)
+│   │   └── setup-python-flavor/SKILL.md  ← Python bootstrap (pre-commit + ruff + uv)
 │   └── commands/check-patterns.md        ← /check-patterns slash command
 ├── CLAUDE.md                             ← Claude's constitution + hooks contract
 └── README.md                             ← this file
 ```
+
+## Triggering Claude from GitHub
+
+The shipped `.github/workflows/claude.yml` wires up the [Claude GitHub Action](https://github.com/anthropics/claude-code-action). Once enabled:
+
+- Tag `@claude` in any issue or PR comment
+- Open a new issue (auto-runs by default — tune the trigger if undesired)
+- Submit a PR review containing `@claude`
+
+Claude runs on a GitHub Actions runner, pushes commits to a `claude/...` branch, and opens a PR back. For question-shaped tasks it just comments.
+
+**One-time setup per repo:**
+
+1. Install the [Claude GitHub App](https://github.com/apps/claude)
+2. Add `ANTHROPIC_API_KEY` as a repo secret (`Settings → Secrets and variables → Actions`)
+3. Push `main`. Claude is now triggerable.
+
+Billed as GitHub Actions minutes + Anthropic API tokens.
 
 ## Prerequisites
 

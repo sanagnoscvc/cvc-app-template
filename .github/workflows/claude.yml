@@ -9,14 +9,14 @@
 #
 # Setup checklist (do once per repo):
 #   1. Install the Claude GitHub App: https://github.com/apps/claude
-#   2. Generate an OAuth token: run `claude setup-token` in your local Claude Code CLI.
-#      Add it as a repo secret named CLAUDE_CODE_OAUTH_TOKEN.
-#      (Alternative for non-Pro/Max users: add ANTHROPIC_API_KEY instead and swap the
-#      input below — uses metered API billing instead of subscription quota.)
+#   2. Get an Anthropic API key: https://console.anthropic.com/settings/keys
+#      Add it as a repo secret named ANTHROPIC_API_KEY.
+#      (Alternative for Pro/Max subscribers: use OAuth instead — see the
+#      commented option below in the action `with:` block.)
 #   3. Push this file to main. Claude is now triggerable.
 #
-# Billing: runs on GitHub Actions runners (your CI minutes) + either your Claude
-# Pro/Max subscription quota (OAuth) or Anthropic API tokens (API key).
+# Billing: runs on GitHub Actions runners (your CI minutes) + Anthropic API
+# tokens (or your Claude Pro/Max subscription quota if you switch to OAuth).
 #
 # Docs: https://code.claude.com/docs/en/github-actions
 
@@ -59,12 +59,15 @@ jobs:
         id: claude
         uses: anthropics/claude-code-action@v1
         with:
-          # OAuth (default, uses Pro/Max subscription quota — set up via
-          # `claude setup-token` locally, then add as a repo secret)
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          # Alternative for non-Pro/Max users: comment the line above and
-          # uncomment the line below + set ANTHROPIC_API_KEY secret instead.
-          # anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Metered API billing via Anthropic API key.
+          # Get a key at https://console.anthropic.com/settings/keys, then
+          # add as a repo secret named ANTHROPIC_API_KEY.
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Alternative for Pro/Max subscribers: comment the line above and
+          # uncomment the line below + set CLAUDE_CODE_OAUTH_TOKEN secret
+          # (generated via `claude setup-token` locally). Uses subscription
+          # quota instead of metered API billing.
+          # claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # Optional: change the trigger phrase
           # trigger_phrase: "/claude"
           #

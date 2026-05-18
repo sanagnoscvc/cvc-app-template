@@ -93,10 +93,10 @@ Claude runs on a GitHub Actions runner, pushes commits to a `claude/...` branch,
 **One-time setup per repo:**
 
 1. Install the [Claude GitHub App](https://github.com/apps/claude)
-2. Add `ANTHROPIC_API_KEY` as a repo secret (`Settings → Secrets and variables → Actions`)
+2. Generate an OAuth token: `claude setup-token` in your local Claude Code CLI. Add it as a repo secret named `CLAUDE_CODE_OAUTH_TOKEN` at `Settings → Secrets and variables → Actions`. *(Non-Pro/Max users: add `ANTHROPIC_API_KEY` instead and swap the input in `.github/workflows/claude.yml`.)*
 3. Push `main`. Claude is now triggerable.
 
-Billed as GitHub Actions minutes + Anthropic API tokens.
+Billed as GitHub Actions minutes + either your Claude Pro/Max subscription quota (OAuth) or Anthropic API tokens (API key).
 
 ## Prerequisites
 

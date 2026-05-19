@@ -2,11 +2,11 @@
 
 A Claude-driven starting point for building internal-tool apps at CVC. Clone this, then ask Claude Code to bootstrap your chosen stack on top.
 
-> **Status:** v0 — universal harness only (no framework or language picked). Language flavors and stack recipes ship in later phases.
+> **Status:** v0.5 — universal harness + language flavors (TS, Python) + stack skills (Vite/React, Supabase) + Claude GitHub Action. Validated end-to-end on a React + Supabase test once. Further stacks (FastAPI, FastMCP, etc.) and tested-via-CI fixtures are pending.
 
-## What's in v0
+## What's in v0.5
 
-A **stack-agnostic Claude harness**. No pre-installed tooling, no framework assumptions. Cloning gets you:
+A **stack-agnostic Claude harness** + a small set of language / stack bootstrap skills. Cloning gets you:
 
 - **Dev container** (`.devcontainer/`) — Reopen in Container in VS Code and you get Node 22, gh CLI, zsh, the Docker socket (DooD), `--network=host` for Supabase compatibility, and a path-aligned workspace mount. Works on Mac and Windows Docker Desktop. Stack-agnostic: post-create only installs npm deps and starts Supabase if the workspace already has them.
 - **The `check-patterns` Claude skill** — encoded review pass Claude runs before each commit to flag duplicated logic and defensive shims
@@ -96,13 +96,13 @@ cvc-app-template/
 
 ## Triggering Claude from GitHub
 
-The shipped `.github/workflows/claude.yml` wires up the [Claude GitHub Action](https://github.com/anthropics/claude-code-action). Once enabled:
+The shipped `.github/workflows/claude.yml` wires up the [Claude GitHub Action](https://github.com/anthropics/claude-code-action). Trigger by mentioning **`@claude`** in:
 
-- Tag `@claude` in any issue or PR comment
-- Open a new issue (auto-runs by default — tune the trigger if undesired)
-- Submit a PR review containing `@claude`
+- an issue body or title (at open time, or by editing afterward)
+- a comment on an issue or PR
+- a PR review body
 
-Claude runs on a GitHub Actions runner, pushes commits to a `claude/...` branch, and opens a PR back. For question-shaped tasks it just comments.
+Claude runs on a GitHub Actions runner. Depending on the task, it may push commits to a `claude/...` branch and post a comment with a link to create the PR, or just reply in-thread for question-shaped tasks. (Exact behavior depends on the action version + Anthropic's current defaults — check the linked docs if you need precise semantics.)
 
 **One-time setup per repo:**
 

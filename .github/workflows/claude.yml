@@ -1,11 +1,18 @@
 # Claude Code GitHub Action.
 #
-# Trigger Claude from issues and PRs:
-# - Mention @claude in an issue body, issue title, PR comment, or PR review
-# - Or open a new issue (Claude auto-runs on every new issue — adjust below if undesired)
+# Trigger Claude by mentioning `@claude` in:
+# - an issue body or title (at open time, or by editing afterward)
+# - a comment on an issue or PR
+# - a PR review body
 #
-# What it does: Claude reads the context, pushes commits to a `claude/...` branch,
-# and opens a PR back to the repo. For question-shaped tasks it just comments.
+# (This workflow does NOT auto-run on every new issue — the `@claude` mention
+# is required. See the `if:` expression on the job below.)
+#
+# What it does: Claude reads the context, may push commits to a `claude/...`
+# branch and post a comment with a link to create the PR. For question-shaped
+# tasks it just replies in-thread. Exact behavior depends on the
+# `claude-code-action` version and Anthropic's current defaults — confirm with
+# the linked docs if you need precise semantics.
 #
 # Setup checklist (do once per repo):
 #   1. Install the Claude GitHub App: https://github.com/apps/claude

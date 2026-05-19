@@ -11,8 +11,13 @@ set -euo pipefail
 cyan='\033[0;36m'; green='\033[0;32m'; reset='\033[0m'
 
 if [ -f package.json ]; then
-  echo -e "${cyan}→ Installing npm dependencies...${reset}"
-  npm install
+  if [ -f package-lock.json ]; then
+    echo -e "${cyan}→ Installing npm dependencies (npm ci — reproducible from lockfile)...${reset}"
+    npm ci
+  else
+    echo -e "${cyan}→ Installing npm dependencies (npm install — no lockfile yet)...${reset}"
+    npm install
+  fi
 fi
 
 # === BEGIN flavor-tooling hooks (appended by setup-*-flavor skills) ===

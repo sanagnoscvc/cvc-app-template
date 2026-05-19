@@ -25,10 +25,21 @@ After this skill completes:
 ## Pre-flight
 
 1. Verify you're in a clone of `cvc-app-template`: `CLAUDE.md`, `.devcontainer/devcontainer.json`, `scripts/check-patterns.sh` exist at repo root.
-2. Check existing state:
-   - **No `package.json`** → you'll scaffold fresh (Step 1).
-   - **`package.json` exists** → either Vite has been scaffolded already (rare) or `setup-ts-flavor` ran first. Either way you can still run this skill — but skip Step 1's scaffold and skip to Step 2 (customize).
-3. Tell the user: *"This skill scaffolds Vite + React + TS, installs Tailwind v4, and wires the standard app skeleton. If you also want Supabase auth, run `setup-supabase-stack` (before or after — they're independent). If you want the lint/format/test harness, run `setup-ts-flavor` (any order)."*
+2. **Detect Vite presence using Vite-specific markers** (not just `package.json` existence — `setup-ts-flavor` creates an empty `package.json` via `npm init -y` and we don't want to mistake that for "Vite already scaffolded"):
+
+   ```bash
+   has_vite=0
+   if [ -f vite.config.ts ] || [ -f vite.config.js ]; then has_vite=1; fi
+   if [ -f package.json ] && grep -q '"vite"' package.json; then has_vite=1; fi
+   if [ -f index.html ] && [ -f src/main.tsx ]; then has_vite=1; fi
+   ```
+
+   - **`has_vite=1`** → skip Step 1 (scaffold). Go straight to Step 2 (customize).
+   - **`has_vite=0`** → run Step 1, even if `package.json` exists (e.g. from `setup-ts-flavor`'s `npm init -y`). Step 1 handles the bare-package.json merge case.
+
+3. **Recommended skill order** (tell the user if there's ambiguity): run **this skill first**, then `setup-ts-flavor`, then `setup-supabase-stack`. Reverse orders work but each combination has caveats — see Step 1's note on merging.
+
+4. Tell the user: *"This skill scaffolds Vite + React + TS, installs Tailwind v4, and wires the standard app skeleton. If you also want Supabase auth, run `setup-supabase-stack` after. If you want the lint/format/test harness, run `setup-ts-flavor` after."*
 
 ## Decisions to make
 
@@ -42,7 +53,7 @@ Don't ask about port, alias, plugin, or Tailwind — those are CVC conventions b
 
 ### Step 1 — Scaffold Vite via `/tmp` (non-destructive)
 
-**Do not** run `npm create vite@latest .` in the harness root with `--overwrite` — it wipes `CLAUDE.md`, `.claude/`, `.devcontainer/`, `.github/`, `scripts/`, `README.md`. Scaffold to `/tmp` and copy the framework files in:
+**Do not** run `npm create vite@latest .` in the harness root with `--overwrite` — it wipes `CLAUDE.md`, `.claude/`, `.devcontainer/`, `.github/`, `scripts/`, `README.md`. Scaffold to `/tmp` and copy the framework files in.
 
 ```bash
 rm -rf /tmp/vite-scaffold
@@ -54,13 +65,37 @@ cd -   # back to the project root
 
 **Note**: `react-swc-ts` was removed in `create-vite` v9. Only `react-ts` remains. We swap the plugin manually in Step 3.
 
-Copy framework files (preserving the harness):
+**Handle the existing-package.json case before copying.** If `setup-ts-flavor` ran first, there's already a `package.json` (from `npm init -y`) that may have a custom `"name"` set. Don't blindly overwrite — capture it first:
+
+```bash
+existing_pkg=""
+if [ -f package.json ]; then
+  existing_pkg=$(cat package.json)
+fi
+```
+
+Copy framework files. If `existing_pkg` was non-empty AND non-bare (has scripts/deps beyond `npm init -y` defaults), refuse and ask the user to either remove `package.json` first or run `setup-vite-react-stack` *before* the other skill. Otherwise overwrite — `npm init -y`'s output has no value to preserve:
 
 ```bash
 cp -r /tmp/vite-scaffold/app/. ./
-# Restore harness files that Vite's templates also include
+# Restore harness files Vite's template also ships
 git checkout -- .gitignore README.md 2>/dev/null || true
 rm -rf /tmp/vite-scaffold
+```
+
+If `existing_pkg` was substantial (e.g. lint-staged config from `setup-ts-flavor`), then *merge* its `"scripts"`, `"dependencies"`, `"devDependencies"`, and `"lint-staged"` keys into the new Vite `package.json` using `jq`:
+
+```bash
+echo "$existing_pkg" > /tmp/old-pkg.json
+jq -s '
+  .[1] as $vite | .[0] as $old |
+  $vite * { scripts: ($vite.scripts + ($old.scripts // {})),
+            dependencies: ($vite.dependencies + ($old.dependencies // {})),
+            devDependencies: ($vite.devDependencies + ($old.devDependencies // {})),
+            "lint-staged": ($old["lint-staged"] // null) }
+' /tmp/old-pkg.json package.json > package.json.merged
+mv package.json.merged package.json
+rm /tmp/old-pkg.json
 ```
 
 After this, the project has both the harness AND a Vite scaffold. `git status` should show ~6-8 new untracked files (`index.html`, `package.json`, `tsconfig*.json`, `vite.config.ts`, `src/`, `public/`, `eslint.config.js`).

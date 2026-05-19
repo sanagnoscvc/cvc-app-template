@@ -9,9 +9,10 @@ Run the check-patterns skill against the currently staged git changes. Examine t
 
 Follow the full procedure defined in the check-patterns skill. Report findings and ask for direction before making changes.
 
-If the check passes (no issues found), write the stamp file so the pre-commit hook allows the commit:
+If the check passes (no issues found), write the **hash of the current staged diff** into the stamp file. The pre-commit gate verifies this exact hash on commit — so re-staging or lint-staged mutations invalidate the audit and force a re-run:
+
 ```bash
-touch .patterns-checked
+git diff --cached | sha256sum | awk '{print $1}' > .patterns-checked
 ```
 
 Then retry the commit that was previously blocked.

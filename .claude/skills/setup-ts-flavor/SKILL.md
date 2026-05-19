@@ -62,12 +62,15 @@ npm install -D \
   prettier \
   typescript \
   vitest \
-  @vitest/coverage-v8 \
-  secretlint \
-  @secretlint/secretlint-rule-preset-recommend
+  @vitest/coverage-v8
 ```
 
-For the dep-vuln gate, `osv-scanner` is a Go binary (not on npm). It needs to be available in the dev container at commit time. The skill installs it automatically via the **flavor-tooling hooks anchor** in `post-create.sh` (see Step 8) — no host install required.
+Two language-agnostic tools are installed via the **flavor-tooling hooks anchor** in `.devcontainer/post-create.sh` (see Step 8b) — both are Go binaries, not on npm:
+
+- **`gitleaks`** — broad secret scanner that runs on *every* staged file (not just JS/TS, so it catches secrets in `.env`, YAML, JSON, etc.).
+- **`osv-scanner`** — dep-vuln scan against the OSV database, runs on lockfiles.
+
+We deliberately do **not** use `secretlint` (npm package) — its default config only scans JS/TS by glob and would leave secrets in non-JS files undetected.
 
 ### Step 3 — Write `eslint.config.js`
 
@@ -162,17 +165,7 @@ If not present:
 
 Drop `jsx` if the project isn't React. Adjust `target`/`module` per runtime.
 
-### Step 5 — Write `.secretlintrc.json`
-
-```json
-{
-  "rules": [
-    {
-      "id": "@secretlint/secretlint-rule-preset-recommend"
-    }
-  ]
-}
-```
+### Step 5 — (skipped — no secretlint; `gitleaks` is used instead, see Step 8b)
 
 ### Step 6 — Write `.osv-scanner.toml`
 
@@ -198,8 +191,10 @@ Merge these into `package.json` (preserve any existing entries):
   },
   "lint-staged": {
     "**/*.{ts,tsx,js,jsx,mjs,cjs}": [
-      "npx secretlint --maskSecrets",
       "npx eslint --max-warnings 0 --no-warn-ignored"
+    ],
+    "**/*.{json,md,yaml,yml,toml,css,html}": [
+      "npx prettier --check"
     ],
     "**/package-lock.json": [
       "osv-scanner --lockfile"
@@ -207,6 +202,8 @@ Merge these into `package.json` (preserve any existing entries):
   }
 }
 ```
+
+Note: secret scanning is **not** in `lint-staged` — `gitleaks` runs in `.husky/pre-commit` directly (Step 8) so it sees the full staged set, not lint-staged's per-glob slices.
 
 ### Step 8 — Wire husky
 
@@ -217,37 +214,64 @@ npx husky init
 That creates `.husky/pre-commit` with a default `npm test` line. Replace its contents with:
 
 ```bash
+# 1. Catch unresolved merge markers in any staged file (file-hygiene gate).
+git diff --check --cached || {
+  echo "Unresolved merge markers in staged files." >&2
+  exit 1
+}
+
+# 2. Broad secret scanning across ALL staged files (not just JS/TS).
+gitleaks protect --staged --no-banner --verbose
+
+# 3. Language-specific lint + formatting + lockfile vuln scan
+#    (configured in package.json's "lint-staged" block).
 npx lint-staged
+
+# 4. Pattern audit gate — hash-bound to the staged diff after lint-staged.
+#    Re-runs are required if lint-staged --fix-mutates anything.
 bash scripts/check-patterns.sh
 ```
 
-`scripts/check-patterns.sh` must run **last** so it gates after all the auto-checkable hooks have passed.
+The patterns gate must run **last** so it stamps a hash of the final, post-`lint-staged` staged diff. Anything that mutates the staged set after the audit invalidates the stamp.
 
-### Step 8b — Patch `post-create.sh` to install osv-scanner in-container
+### Step 8b — Patch `post-create.sh` to install Go-binary gate tools
 
-`osv-scanner` is a Go binary, not on npm. The `lint-staged` hook in Step 7 calls `osv-scanner --lockfile`, so the binary must be on `PATH` inside the dev container before any commit. Patch `.devcontainer/post-create.sh` by inserting the following block **between** the `flavor-tooling hooks` anchor markers (the anchor markers exist in every fresh `cvc-app-template` clone):
+Two Go binaries (`gitleaks`, `osv-scanner`) drive the flavor's secret + dep-vuln gates. Neither is on npm; both need to be on `PATH` inside the dev container before any commit. Patch `.devcontainer/post-create.sh` by inserting the block below **between** the `flavor-tooling hooks` anchor markers.
+
+**Idempotency check first** — if the sentinel comment `# ts-flavor-tools` is already present, do nothing (the block has been applied before). Otherwise insert it.
 
 ```bash
-# Install osv-scanner (Go binary, not on npm). Idempotent — skipped if
-# already present. Required by the TS-flavor lockfile-vuln gate.
-if [ -f package-lock.json ] && ! command -v osv-scanner >/dev/null 2>&1; then
-  echo -e "${cyan}→ Installing osv-scanner (TS-flavor lockfile gate)...${reset}"
-  arch=$(uname -m)
-  case "$arch" in
-    x86_64)  osv_asset="osv-scanner_linux_amd64" ;;
-    aarch64) osv_asset="osv-scanner_linux_arm64" ;;
-    *) echo "  WARN: unknown arch '$arch' — install osv-scanner manually" >&2; osv_asset="" ;;
-  esac
-  if [ -n "$osv_asset" ]; then
-    sudo curl -fsSL -o /usr/local/bin/osv-scanner \
-      "https://github.com/google/osv-scanner/releases/latest/download/${osv_asset}"
-    sudo chmod +x /usr/local/bin/osv-scanner
-    osv-scanner --version
-  fi
+# ts-flavor-tools — install Go-binary gate tools (gitleaks, osv-scanner).
+# Both are pinned. Idempotent: skipped if already present on PATH.
+GITLEAKS_VERSION=8.21.2
+OSV_SCANNER_VERSION=1.9.2
+
+arch=$(uname -m)
+case "$arch" in
+  x86_64)  gl_arch="x64";  osv_asset="osv-scanner_linux_amd64" ;;
+  aarch64) gl_arch="arm64"; osv_asset="osv-scanner_linux_arm64" ;;
+  *) echo "  WARN: unknown arch '$arch' — install gitleaks + osv-scanner manually" >&2;
+     gl_arch=""; osv_asset="" ;;
+esac
+
+if [ -n "$gl_arch" ] && ! command -v gitleaks >/dev/null 2>&1; then
+  echo -e "${cyan}→ Installing gitleaks v${GITLEAKS_VERSION} (TS-flavor secret-scan gate)...${reset}"
+  tmpdir=$(mktemp -d)
+  curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_${gl_arch}.tar.gz" \
+    | tar -xz -C "$tmpdir" gitleaks
+  sudo mv "$tmpdir/gitleaks" /usr/local/bin/gitleaks
+  rm -rf "$tmpdir"
+fi
+
+if [ -n "$osv_asset" ] && ! command -v osv-scanner >/dev/null 2>&1; then
+  echo -e "${cyan}→ Installing osv-scanner v${OSV_SCANNER_VERSION} (TS-flavor lockfile gate)...${reset}"
+  sudo curl -fsSL -o /usr/local/bin/osv-scanner \
+    "https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/${osv_asset}"
+  sudo chmod +x /usr/local/bin/osv-scanner
 fi
 ```
 
-Find the marker `# === BEGIN flavor-tooling hooks (appended by setup-*-flavor skills) ===` and insert the block above the `# === END flavor-tooling hooks ===` line. Don't replace existing lines — append.
+Find the marker `# === BEGIN flavor-tooling hooks (appended by setup-*-flavor skills) ===` and insert this block above the `# === END flavor-tooling hooks ===` line. **Pin versions** as shown above — never `latest`. To bump, update `GITLEAKS_VERSION` / `OSV_SCANNER_VERSION` in the block.
 
 ### Step 9 — Verify
 
@@ -276,11 +300,12 @@ package.json                       ← scripts + devDeps + lint-staged config
 package-lock.json                  ← (auto)
 eslint.config.js                   ← complexity gates
 tsconfig.json
-.secretlintrc.json
 .osv-scanner.toml
-.husky/pre-commit                  ← runs lint-staged → check-patterns gate
-.devcontainer/post-create.sh       ← patched: osv-scanner install block in
-                                     the flavor-tooling anchor section
+.husky/pre-commit                  ← 4-step: merge-markers → gitleaks →
+                                     lint-staged → patterns gate
+.devcontainer/post-create.sh       ← patched: pinned gitleaks + osv-scanner
+                                     install block in the flavor-tooling
+                                     anchor section
 ```
 
 ## What NOT to do

@@ -74,6 +74,20 @@ Either way, the script blocks the commit until `.patterns-checked` exists. You p
 4. Do not change the git hooks that are in place without the user's explicit instruction.
 5. You are responsible for fixing **ALL** issues discovered during commit checks — even if they exist in files you didn't modify or are unrelated to the work done in the current session. The goal is always a clean commit.
 
+## Dev container threat model
+
+The dev container is configured for the user's own development convenience, **not** as a security sandbox against malicious code:
+
+- `~/.claude` and `~/.ssh` are bind-mounted from the host so Claude Code and `gh`/`git` work inside the container the same way they do on the host. Anything running in the container can read these.
+- The host's Docker socket is mounted (DooD) — code in the container can launch sibling containers on the host's Docker.
+- `npm install` runs automatically on container rebuild if `package.json` exists. This executes `postinstall` scripts in npm packages.
+
+A malicious npm package's `postinstall` could read host credentials via the bind mounts and drive Docker via the socket. **This is the same exposure you'd have running `npm install` on the host directly** — the dev container is not stronger isolation, just a *consistency boundary* (same Node version, same system deps, same tooling for every teammate).
+
+If you need stronger isolation for genuinely untrusted code (running an AI-generated script you don't trust, executing user-uploaded code, etc.), use a Vercel Sandbox, ephemeral cloud container, or VM — not this dev container.
+
+When you bootstrap a stack, only add credentials the stack will actually use. e.g. `setup-supabase-stack` adds `SUPABASE_ACCESS_TOKEN` to `remoteEnv` because Supabase migrations against a linked remote project need it. Don't add credentials to the base for stacks that aren't wired.
+
 ## Stack skills and the modularity contract
 
 The base harness is **stack-agnostic by design**. Supabase, FastAPI, Vite, FastMCP — none of those ship pre-wired. Each stack lives as its own self-contained skill at `.claude/skills/setup-<stack>-stack/`, invoked when the user asks for it.

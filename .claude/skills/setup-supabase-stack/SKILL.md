@@ -115,16 +115,29 @@ Creates two test users:
 
 Merge the following into the existing JSON (don't overwrite the file). Use a tool (or careful hand-edit) to:
 
-- Append `54321, 54322, 54323` to `forwardPorts` if not present
+- Append `54321, 54322, 54323, 54324` to `forwardPorts` if not present (54324 is Mailpit / inbucket — see Step 9; either forward it or set `[inbucket].enabled = false` in `supabase/config.toml` and skip it)
 - Add these entries to `portsAttributes`:
   ```json
   "54321": { "label": "Supabase API",     "onAutoForward": "silent" },
   "54322": { "label": "Supabase Postgres","onAutoForward": "silent" },
-  "54323": { "label": "Supabase Studio",  "onAutoForward": "notify" }
+  "54323": { "label": "Supabase Studio",  "onAutoForward": "notify" },
+  "54324": { "label": "Mailpit (auth emails)", "onAutoForward": "silent" }
   ```
-- Add `"SUPABASE_ACCESS_TOKEN": "${localEnv:SUPABASE_ACCESS_TOKEN}"` to `remoteEnv`
+- Add `"SUPABASE_ACCESS_TOKEN": "${localEnv:SUPABASE_ACCESS_TOKEN}"` to `remoteEnv` (only useful if the user will link to a remote Supabase project; harmless if unset)
 
-Re-read the file after editing and check JSON is still valid (use `jq . .devcontainer/devcontainer.json`).
+Re-validate the file after editing. **`devcontainer.json` is JSONC** (allows `//` comments) so `jq` will fail to parse it. Use `python3` with comment-stripping instead — Python is always available in the dev container:
+
+```bash
+python3 - <<'PY'
+import json, re, sys
+src = open('.devcontainer/devcontainer.json').read()
+# Strip // line comments (best-effort; doesn't handle // inside strings,
+# which the devcontainer schema doesn't use anyway).
+cleaned = re.sub(r'^\s*//.*$', '', src, flags=re.MULTILINE)
+json.loads(cleaned)
+print('OK: devcontainer.json valid')
+PY
+```
 
 ### Step 6 — Patch `.devcontainer/post-create.sh`
 

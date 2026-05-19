@@ -61,12 +61,14 @@ Look for staged code that papers over upstream inconsistencies instead of fixing
 
 If the staged changes look clean — no duplications, no unnecessary fallbacks:
 
-1. Write the stamp file so the pre-commit hook passes on the next commit attempt:
+1. Write the **hash of the current staged diff** into the stamp file. The pre-commit gate verifies this exact hash on commit, so the audit is bound to what's about to be committed — not just "any audit at any time":
    ```bash
-   touch .patterns-checked
+   git diff --cached | sha256sum | awk '{print $1}' > .patterns-checked
    ```
 2. Report briefly:
-   > "Staged changes look clean — no duplicated patterns or unnecessary fallbacks detected. Stamp written — commit will proceed."
+   > "Staged changes look clean — no duplicated patterns or unnecessary fallbacks detected. Stamp written (hash-bound to the current staged diff). Commit will proceed unless you stage more files or lint-staged mutates anything."
+
+If the user stages more files after the audit, or lint-staged auto-fixes something during the commit run, the hash will no longer match and the gate will refuse the commit — re-run the audit at that point.
 
 ## Important Guidelines
 

@@ -42,3 +42,7 @@ yarn-error.log*
 
 # Local pre-commit stamp (transient — regenerated each commit cycle)
 .patterns-checked
+
+# git-ai local SQLite cache (transcripts/attribution metadata; the
+# refs/notes/git-ai/* refspec is the cross-machine source of truth)
+.git-ai/

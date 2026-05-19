@@ -23,6 +23,35 @@ if [ -f package.json ]; then
   npm install
 fi
 
+# === Universal harness tools ===
+# Installed in every CVC app dev container regardless of stack.
+
+# git-ai: tracks AI-generated code attribution (which agent + prompt produced
+# each line). Survives rebases/merges via Git Notes. Local-first by default
+# — no telemetry leaves the container without explicit team-cloud config.
+# Docs: https://usegitai.com
+GIT_AI_VERSION=1.4.11
+if ! command -v git-ai >/dev/null 2>&1; then
+  arch=$(uname -m)
+  case "$arch" in
+    x86_64)  ga_asset="git-ai-linux-x64" ;;
+    aarch64) ga_asset="git-ai-linux-arm64" ;;
+    *) echo "  WARN: unknown arch '$arch' — install git-ai manually" >&2; ga_asset="" ;;
+  esac
+  if [ -n "$ga_asset" ]; then
+    echo -e "${cyan}→ Installing git-ai v${GIT_AI_VERSION} (AI-code attribution)...${reset}"
+    sudo curl -fsSL -o /usr/local/bin/git-ai \
+      "https://github.com/git-ai-project/git-ai/releases/download/v${GIT_AI_VERSION}/${ga_asset}"
+    sudo chmod +x /usr/local/bin/git-ai
+    # Preserve attribution notes across rebases / merges / cherry-picks.
+    if [ -d .git ]; then
+      git config --local notes.rewrite.amend true
+      git config --local notes.rewriteRef 'refs/notes/git-ai/*' || true
+    fi
+  fi
+fi
+# === End universal harness tools ===
+
 # === BEGIN flavor-tooling hooks (appended by setup-*-flavor skills) ===
 # Language-flavor tooling that isn't installable via the project's package
 # manager (e.g. Go binaries needed by lint-staged hooks). Appended here so

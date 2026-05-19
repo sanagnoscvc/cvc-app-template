@@ -9,6 +9,7 @@ A Claude-driven starting point for building internal-tool apps at CVC. Clone thi
 A **stack-agnostic Claude harness** + a small set of language / stack bootstrap skills. Cloning gets you:
 
 - **Dev container** (`.devcontainer/`) — Reopen in Container in VS Code and you get Node 22, gh CLI, zsh, the Docker socket (DooD), `--network=host` for Supabase compatibility, and a path-aligned workspace mount. Works on Mac and Windows Docker Desktop. Stack-agnostic: post-create only installs npm deps and starts Supabase if the workspace already has them.
+- **AI-code attribution** ([`git-ai`](https://usegitai.com)) — installed by post-create. Auto-tags each commit with the AI agent + prompt that produced each line; survives rebases/merges via Git Notes. Local-first; no telemetry leaves the container. Use `/who-wrote-this <file>` from Claude Code, or `git ai blame <file>` directly. Useful for PR review (*"this PR is 80% AI — extra eyes"*) and post-hoc bug audits.
 - **The `check-patterns` Claude skill** — encoded review pass Claude runs before each commit to flag duplicated logic and defensive shims
 - **The `check-patterns.sh` gate script** — blocks commits until the audit has run (paired with whatever pre-commit framework Claude wires up for your stack)
 - **Flavor bootstrap skills** — `setup-ts-flavor` and `setup-python-flavor` encode the deterministic install + config steps for each language family, so Claude doesn't re-derive them every time

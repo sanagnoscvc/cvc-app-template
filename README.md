@@ -12,6 +12,7 @@ A **stack-agnostic Claude harness**. No pre-installed tooling, no framework assu
 - **The `check-patterns` Claude skill** — encoded review pass Claude runs before each commit to flag duplicated logic and defensive shims
 - **The `check-patterns.sh` gate script** — blocks commits until the audit has run (paired with whatever pre-commit framework Claude wires up for your stack)
 - **Flavor bootstrap skills** — `setup-ts-flavor` and `setup-python-flavor` encode the deterministic install + config steps for each language family, so Claude doesn't re-derive them every time
+- **Stack bootstrap skills** — modular, per-stack additions (`setup-supabase-stack` is the first). When invoked, a stack skill writes its own files, patches `devcontainer.json` + `post-create.sh` between the anchor comments, adds its deps, and prompts for a container rebuild. Multiple stack skills compose
 - **Claude GitHub Action** (`.github/workflows/claude.yml`) — `@claude` in any issue or PR comment runs Claude on a CI runner: it commits to a `claude/...` branch and opens a PR back
 - **`CLAUDE.md`** — Claude's constitution for working in CVC apps. Defines the **hooks contract** (what every commit must be gated on) and points Claude at the right flavor skill per stack
 - **A multi-language `.gitignore`** baseline
@@ -79,9 +80,12 @@ cvc-app-template/
 │   └── check-patterns.sh                 ← gate script (blocks commit until stamp exists)
 ├── .claude/
 │   ├── skills/
-│   │   ├── check-patterns/SKILL.md       ← the pre-commit audit skill
-│   │   ├── setup-ts-flavor/SKILL.md      ← TS/JS bootstrap (husky + lint-staged + eslint)
-│   │   └── setup-python-flavor/SKILL.md  ← Python bootstrap (pre-commit + ruff + uv)
+│   │   ├── check-patterns/SKILL.md           ← the pre-commit audit skill
+│   │   ├── setup-ts-flavor/SKILL.md          ← TS/JS bootstrap (husky + lint-staged + eslint)
+│   │   ├── setup-python-flavor/SKILL.md      ← Python bootstrap (pre-commit + ruff + uv)
+│   │   └── setup-supabase-stack/             ← Supabase stack: migrations + RLS + devcontainer patches
+│   │       ├── SKILL.md
+│   │       └── assets/{foundation.sql,seed.sql}
 │   └── commands/check-patterns.md        ← /check-patterns slash command
 ├── CLAUDE.md                             ← Claude's constitution + hooks contract
 └── README.md                             ← this file

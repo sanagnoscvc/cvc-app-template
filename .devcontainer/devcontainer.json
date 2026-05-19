@@ -65,18 +65,20 @@
   // a "ready, ask Claude to bootstrap" hint.
   "postCreateCommand": "bash .devcontainer/post-create.sh",
 
-  "forwardPorts": [8080, 5173, 54321, 54322, 54323],
+  // Generic web-dev ports. Stack skills extend this list (e.g.
+  // setup-supabase-stack adds 54321/54322/54323) by merging into
+  // forwardPorts + portsAttributes.
+  "forwardPorts": [3000, 5173, 8080],
   "portsAttributes": {
-    "8080":  { "label": "Vite dev server (default port)",  "onAutoForward": "notify" },
-    "5173":  { "label": "Vite dev server (alt port)",      "onAutoForward": "silent" },
-    "54321": { "label": "Supabase API",                    "onAutoForward": "silent" },
-    "54322": { "label": "Supabase Postgres",               "onAutoForward": "silent" },
-    "54323": { "label": "Supabase Studio",                 "onAutoForward": "silent" }
+    "3000": { "label": "App (common: Next.js, Express)",  "onAutoForward": "silent" },
+    "5173": { "label": "Vite dev server (default port)",  "onAutoForward": "notify" },
+    "8080": { "label": "App (alt port)",                  "onAutoForward": "silent" }
   },
 
+  // Stack skills extend this object with their own env vars (e.g.
+  // setup-supabase-stack adds SUPABASE_ACCESS_TOKEN).
   "remoteEnv": {
-    "ANTHROPIC_API_KEY": "${localEnv:ANTHROPIC_API_KEY}",
-    "SUPABASE_ACCESS_TOKEN": "${localEnv:SUPABASE_ACCESS_TOKEN}"
+    "ANTHROPIC_API_KEY": "${localEnv:ANTHROPIC_API_KEY}"
   },
 
   // Make sure host dirs exist before we bind-mount them.

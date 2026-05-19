@@ -74,6 +74,30 @@ Either way, the script blocks the commit until `.patterns-checked` exists. You p
 4. Do not change the git hooks that are in place without the user's explicit instruction.
 5. You are responsible for fixing **ALL** issues discovered during commit checks — even if they exist in files you didn't modify or are unrelated to the work done in the current session. The goal is always a clean commit.
 
+## Stack skills and the modularity contract
+
+The base harness is **stack-agnostic by design**. Supabase, FastAPI, Vite, FastMCP — none of those ship pre-wired. Each stack lives as its own self-contained skill at `.claude/skills/setup-<stack>-stack/`, invoked when the user asks for it.
+
+When you invoke a stack skill, it's responsible for **all** of the following:
+
+1. **Writing its own files** (e.g. `supabase/config.toml`, migrations, seed.sql).
+2. **Patching `.devcontainer/devcontainer.json`** — merging additional `forwardPorts`, `portsAttributes`, `remoteEnv` keys. Don't overwrite existing entries; merge.
+3. **Patching `.devcontainer/post-create.sh`** — appending its own post-create steps **between** the anchor comments:
+   ```bash
+   # === BEGIN stack-specific hooks (appended by setup-*-stack skills) ===
+   # ↑ append above this line
+   # === END stack-specific hooks ===
+   ```
+   This way multiple stack skills can be applied without overwriting each other.
+4. **Modifying `package.json` / `pyproject.toml`** to add stack-specific deps.
+5. **Prompting the user to rebuild the dev container** at the end, so the devcontainer changes take effect.
+
+Available stack skills:
+
+- `setup-supabase-stack` — Supabase OLTP (auth + RLS + migrations skeleton). Adds Supabase CLI dep, scaffolds migrations, patches devcontainer for ports 54321/54322/54323.
+
+(More stack skills will be added as the supported set grows. If a user asks for a stack that has no skill, follow the same modularity contract by hand and document what you did so the work can be extracted into a skill later.)
+
 ## Running from the GitHub Action
 
 `.github/workflows/claude.yml` wires up the Claude GitHub Action. When triggered by `@claude` in an issue or PR (or by an issue being opened/assigned), you run on a CI runner, commit to a `claude/...` branch, and open a PR back.
@@ -90,4 +114,5 @@ When running via the Action:
 - **Don't soften the hooks contract** to make commits faster. Lower bars for "convenience" defeat the purpose.
 - **Don't pick a framework the user's stack doesn't naturally use** (e.g. installing the `pre-commit` Python tool in a pure Node project just because you've used it before). Match the idiom.
 - **Don't add application code to this template repo**. v0 is harness-only. Stack-specific work happens in repos *cloned from* this one, not inside it.
+- **Don't add stack-specific files to the base harness** (e.g. supabase/, vite.config.ts, pyproject.toml). Those belong in skills, not in the base. The post-create.sh and devcontainer.json should stay stack-agnostic until a stack skill patches them.
 - **Don't rewrite `check-patterns.sh` or the `check-patterns` skill**. They're the canonical artifacts. Wire them in; don't re-derive them.

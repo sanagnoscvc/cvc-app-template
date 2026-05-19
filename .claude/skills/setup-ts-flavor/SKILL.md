@@ -50,7 +50,7 @@ Then edit it to set `"type": "module"` and `"private": true`.
 ```bash
 npm install -D \
   husky \
-  lint-staged \
+  "lint-staged@^16" \
   "eslint@^9" \
   "@eslint/js@^9" \
   typescript-eslint \
@@ -64,6 +64,8 @@ npm install -D \
   vitest \
   @vitest/coverage-v8
 ```
+
+**Note on `lint-staged@^16`**: v17+ requires Node `>=22.22.1`, but the dev container's `typescript-node:1-22-bookworm` base image currently ships Node `22.16`. v16 is the latest that's engine-compatible. Bump when the base image moves past 22.22.
 
 Two language-agnostic tools are installed via the **flavor-tooling hooks anchor** in `.devcontainer/post-create.sh` (see Step 8b) — both are Go binaries, not on npm:
 

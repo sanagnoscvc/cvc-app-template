@@ -11,13 +11,16 @@ set -euo pipefail
 cyan='\033[0;36m'; green='\033[0;32m'; reset='\033[0m'
 
 if [ -f package.json ]; then
-  if [ -f package-lock.json ]; then
-    echo -e "${cyan}→ Installing npm dependencies (npm ci — reproducible from lockfile)...${reset}"
-    npm ci
-  else
-    echo -e "${cyan}→ Installing npm dependencies (npm install — no lockfile yet)...${reset}"
-    npm install
-  fi
+  # Use `npm install`, not `npm ci`. `npm ci` is reproducible but too strict
+  # for this context: when devs run `npm install` on their host (different
+  # arch — typically macOS arm64) and then rebuild the Linux dev container,
+  # the lockfile's platform-specific optionalDeps (e.g. @emnapi/* for @swc/core)
+  # drift and `npm ci` refuses with "Missing X from lock file." `npm install`
+  # is lenient — it updates the lockfile in place rather than failing. Use
+  # `npm ci` in your prod CI pipeline where the lockfile is the source of
+  # truth, not here.
+  echo -e "${cyan}→ Installing npm dependencies...${reset}"
+  npm install
 fi
 
 # === BEGIN flavor-tooling hooks (appended by setup-*-flavor skills) ===

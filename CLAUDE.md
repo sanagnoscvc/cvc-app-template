@@ -98,6 +98,12 @@ If you need stronger isolation for genuinely untrusted code (running an AI-gener
 
 When you bootstrap a stack, only add credentials the stack will actually use. e.g. `setup-supabase-stack` adds `SUPABASE_ACCESS_TOKEN` to `remoteEnv` because Supabase migrations against a linked remote project need it. Don't add credentials to the base for stacks that aren't wired.
 
+## AI-code attribution (`git-ai`)
+
+Every dev container has [`git-ai`](https://usegitai.com) installed (universal harness tool, not flavor-specific). It auto-attributes each line you commit to the agent + prompt that produced it, persisted via Git Notes and survives rebases/merges. Local-first — no telemetry leaves the container without explicit team-cloud opt-in.
+
+Practical effect for you (Claude): your contributions are tracked. Treat that as accountability — when an engineer runs `/who-wrote-this` on a buggy line and it points at your prompt, the prompt becomes evidence. Quality matters because it's audited downstream.
+
 ## Stack skills and the modularity contract
 
 The base harness is **stack-agnostic by design**. Supabase, FastAPI, Vite, FastMCP — none of those ship pre-wired. Each stack lives as its own self-contained skill at `.claude/skills/setup-<stack>-stack/`, invoked when the user asks for it.

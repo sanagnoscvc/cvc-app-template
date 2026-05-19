@@ -45,12 +45,14 @@ Then edit it to set `"type": "module"` and `"private": true`.
 
 ### Step 2 — Install dev dependencies
 
+**Important: pin ESLint to `^9`.** `eslint-plugin-import` doesn't support ESLint 10 yet, and Vite scaffolds with v10. Without the pin, `npm install` fails with `ERESOLVE`.
+
 ```bash
 npm install -D \
   husky \
   lint-staged \
-  eslint \
-  @eslint/js \
+  "eslint@^9" \
+  "@eslint/js@^9" \
   typescript-eslint \
   @typescript-eslint/eslint-plugin \
   @typescript-eslint/parser \
@@ -65,15 +67,7 @@ npm install -D \
   @secretlint/secretlint-rule-preset-recommend
 ```
 
-For the dep-vuln gate, install `osv-scanner` as a system binary:
-
-```bash
-# macOS
-brew install osv-scanner
-# Linux: see https://github.com/google/osv-scanner/releases
-```
-
-If `brew` isn't available and we're on Linux/WSL, instruct the user to install osv-scanner from the GitHub release and surface that as a manual step.
+For the dep-vuln gate, `osv-scanner` is a Go binary (not on npm). It needs to be available in the dev container at commit time. The skill installs it automatically via the **flavor-tooling hooks anchor** in `post-create.sh` (see Step 8) — no host install required.
 
 ### Step 3 — Write `eslint.config.js`
 
@@ -229,6 +223,32 @@ bash scripts/check-patterns.sh
 
 `scripts/check-patterns.sh` must run **last** so it gates after all the auto-checkable hooks have passed.
 
+### Step 8b — Patch `post-create.sh` to install osv-scanner in-container
+
+`osv-scanner` is a Go binary, not on npm. The `lint-staged` hook in Step 7 calls `osv-scanner --lockfile`, so the binary must be on `PATH` inside the dev container before any commit. Patch `.devcontainer/post-create.sh` by inserting the following block **between** the `flavor-tooling hooks` anchor markers (the anchor markers exist in every fresh `cvc-app-template` clone):
+
+```bash
+# Install osv-scanner (Go binary, not on npm). Idempotent — skipped if
+# already present. Required by the TS-flavor lockfile-vuln gate.
+if [ -f package-lock.json ] && ! command -v osv-scanner >/dev/null 2>&1; then
+  echo -e "${cyan}→ Installing osv-scanner (TS-flavor lockfile gate)...${reset}"
+  arch=$(uname -m)
+  case "$arch" in
+    x86_64)  osv_asset="osv-scanner_linux_amd64" ;;
+    aarch64) osv_asset="osv-scanner_linux_arm64" ;;
+    *) echo "  WARN: unknown arch '$arch' — install osv-scanner manually" >&2; osv_asset="" ;;
+  esac
+  if [ -n "$osv_asset" ]; then
+    sudo curl -fsSL -o /usr/local/bin/osv-scanner \
+      "https://github.com/google/osv-scanner/releases/latest/download/${osv_asset}"
+    sudo chmod +x /usr/local/bin/osv-scanner
+    osv-scanner --version
+  fi
+fi
+```
+
+Find the marker `# === BEGIN flavor-tooling hooks (appended by setup-*-flavor skills) ===` and insert the block above the `# === END flavor-tooling hooks ===` line. Don't replace existing lines — append.
+
 ### Step 9 — Verify
 
 Stage a trivial change and attempt a commit:
@@ -252,13 +272,15 @@ That's the expected end-state — the gate refuses because `.patterns-checked` d
 ## What you've added
 
 ```
-package.json              ← scripts + devDeps + lint-staged config
-package-lock.json         ← (auto)
-eslint.config.js          ← complexity gates
+package.json                       ← scripts + devDeps + lint-staged config
+package-lock.json                  ← (auto)
+eslint.config.js                   ← complexity gates
 tsconfig.json
 .secretlintrc.json
 .osv-scanner.toml
-.husky/pre-commit         ← runs lint-staged → check-patterns gate
+.husky/pre-commit                  ← runs lint-staged → check-patterns gate
+.devcontainer/post-create.sh       ← patched: osv-scanner install block in
+                                     the flavor-tooling anchor section
 ```
 
 ## What NOT to do

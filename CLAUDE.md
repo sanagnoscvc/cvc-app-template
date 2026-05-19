@@ -82,19 +82,26 @@ When you invoke a stack skill, it's responsible for **all** of the following:
 
 1. **Writing its own files** (e.g. `supabase/config.toml`, migrations, seed.sql).
 2. **Patching `.devcontainer/devcontainer.json`** — merging additional `forwardPorts`, `portsAttributes`, `remoteEnv` keys. Don't overwrite existing entries; merge.
-3. **Patching `.devcontainer/post-create.sh`** — appending its own post-create steps **between** the anchor comments:
+3. **Patching `.devcontainer/post-create.sh`** — appending steps **between** the appropriate anchor block. There are two:
+
    ```bash
+   # === BEGIN flavor-tooling hooks (appended by setup-*-flavor skills) ===
+   # ↑ flavor skills append here (e.g. installing osv-scanner binary)
+   # === END flavor-tooling hooks ===
+
    # === BEGIN stack-specific hooks (appended by setup-*-stack skills) ===
-   # ↑ append above this line
+   # ↑ stack skills append here (e.g. `supabase start`, framework boot)
    # === END stack-specific hooks ===
    ```
-   This way multiple stack skills can be applied without overwriting each other.
+
+   Flavor-tooling runs first so stack hooks can rely on the tooling being in place. Multiple skills compose within each block by appending to it.
 4. **Modifying `package.json` / `pyproject.toml`** to add stack-specific deps.
 5. **Prompting the user to rebuild the dev container** at the end, so the devcontainer changes take effect.
 
 Available stack skills:
 
-- `setup-supabase-stack` — Supabase OLTP (auth + RLS + migrations skeleton). Adds Supabase CLI dep, scaffolds migrations, patches devcontainer for ports 54321/54322/54323.
+- `setup-vite-react-stack` — Vite + React + TypeScript SPA. Port 8080, `@` alias, `@vitejs/plugin-react-swc`, Tailwind v4 via `@tailwindcss/vite`, react-router-dom, and (optionally) the standard Supabase auth glue (`client.ts` + `ProtectedRoute` + `LoginPage` + `Dashboard`).
+- `setup-supabase-stack` — Supabase OLTP (auth + RLS + migrations skeleton). Adds Supabase CLI dep, scaffolds migrations + seed, patches devcontainer for ports 54321/54322/54323.
 
 (More stack skills will be added as the supported set grows. If a user asks for a stack that has no skill, follow the same modularity contract by hand and document what you did so the work can be extracted into a skill later.)
 

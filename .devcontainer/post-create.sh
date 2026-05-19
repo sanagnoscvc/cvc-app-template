@@ -15,7 +15,15 @@ if [ -f package.json ]; then
   npm install
 fi
 
+# === BEGIN flavor-tooling hooks (appended by setup-*-flavor skills) ===
+# Language-flavor tooling that isn't installable via the project's package
+# manager (e.g. Go binaries needed by lint-staged hooks). Appended here so
+# every container rebuild ensures the tools are present and on PATH.
+# === END flavor-tooling hooks ===
+
 # === BEGIN stack-specific hooks (appended by setup-*-stack skills) ===
+# Stack-level boot-up (e.g. `supabase start`, `uv sync`, framework-specific
+# startup). Runs after flavor tooling is in place.
 # === END stack-specific hooks ===
 
 cat <<EOF

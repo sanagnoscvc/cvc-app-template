@@ -83,6 +83,9 @@ cvc-app-template/
 │   │   ├── check-patterns/SKILL.md           ← the pre-commit audit skill
 │   │   ├── setup-ts-flavor/SKILL.md          ← TS/JS bootstrap (husky + lint-staged + eslint)
 │   │   ├── setup-python-flavor/SKILL.md      ← Python bootstrap (pre-commit + ruff + uv)
+│   │   ├── setup-vite-react-stack/           ← Vite + React + TS stack: port + alias + Tailwind v4 + Supabase auth glue
+│   │   │   ├── SKILL.md
+│   │   │   └── assets/{vite.config.ts,main.tsx,index.css,client.ts,ProtectedRoute.tsx,LoginPage.tsx,Dashboard.tsx}
 │   │   └── setup-supabase-stack/             ← Supabase stack: migrations + RLS + devcontainer patches
 │   │       ├── SKILL.md
 │   │       └── assets/{foundation.sql,seed.sql}

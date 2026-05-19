@@ -29,6 +29,20 @@ After this skill completes:
    - For TS projects: `package.json` exists. If not, run `setup-ts-flavor` first.
    - For Python projects: `pyproject.toml` exists. If not, run `setup-python-flavor` first.
 3. Verify Supabase isn't already wired: check that `supabase/config.toml` does **not** exist. If it does, the stack is already set up — ask the user what they want done instead (e.g. add a new migration).
+4. **Port collision check**: under DooD, Supabase containers run on the host's docker. If another Supabase project is already running, ports 54321/54322/54323 are taken and `supabase start` will fail with `Bind for 0.0.0.0:54322 failed: port is already allocated`.
+
+   Check:
+   ```bash
+   docker ps --filter "name=_supabase_db_" --format '{{.Names}}'
+   ```
+
+   If anything is listed, stop and offer the user three options:
+
+   - **Stop the other stack** (preserves data; can be restarted later): `docker stop $(docker ps -q --filter "name=_supabase_db_")` — and for cleanup `docker rm -f $(docker ps -aq --filter "name=_supabase_<project>_")`.
+   - **Shift this project's ports**: change `[api].port`, `[db].port`, `[studio].port`, `[inbucket].port` in the generated `supabase/config.toml` (Step 2) to a non-overlapping range like 54421–54424. Update `forwardPorts` + `portsAttributes` in `devcontainer.json` Step 5 accordingly. Update the .env.local generation in Step 6 — it auto-uses whatever ports the CLI reports, so it just works.
+   - **Both coexist** with different ports — same as above.
+
+   Default recommendation: stop the other stack unless the user has active work there.
 
 ## Decisions to make
 
@@ -64,7 +78,7 @@ Decline VS Code/Cursor IDE auto-prompts (`N` when asked). This creates:
 
 ### Step 3 — Drop in the foundation migration
 
-Copy the asset file into the project's migrations dir. Use the current UTC timestamp as the migration prefix (format: `YYYYMMDDHHMMSS`).
+Copy the asset file into the project's migrations dir. Use the current UTC timestamp as the migration prefix (format: `YYYYMMDDHHMMSS`). **`mkdir -p` is required** — newer Supabase CLI versions don't create `supabase/migrations/` during `supabase init`.
 
 ```bash
 ts=$(date -u +%Y%m%d%H%M%S)
@@ -183,14 +197,17 @@ Tell the user:
 > **Rebuild the container** now (`F1` → *Dev Containers: Rebuild Container*) so the changes take effect. First rebuild will pull ~10 Docker images (~2-3 min).
 >
 > After the rebuild completes, you'll have:
-> - http://localhost:54321 — Supabase API
+> - http://localhost:54321 — Supabase API (kong)
 > - http://localhost:54322 — Postgres
 > - http://localhost:54323 — Supabase Studio (DB browser)
+> - http://localhost:54324 — Mailpit (catches outbound emails for password-reset / magic-link testing — Supabase default; harmless if unused)
 > - `.env.local` auto-generated with the API URL + anon key
 >
-> Test users:
+> Test users seeded in `supabase/seed.sql`:
 > - `admin@localhost.local` / `admin1234` (admin)
-> - `member@localhost.local` / `member1234` (member)"
+> - `member@localhost.local` / `member1234` (member)
+>
+> If you don't need Mailpit, set `[inbucket].enabled = false` in `supabase/config.toml` and drop port 54324 from the devcontainer's `forwardPorts`."
 
 ## What you've added
 

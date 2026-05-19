@@ -166,11 +166,12 @@ Read the existing `tsconfig.app.json` (Vite scaffolded it) and merge in:
 
 ### Step 8 — Wipe the demo scaffold and write the app skeleton
 
-Remove Vite's demo files:
+Remove Vite's demo files. The exact set has shifted in `create-vite` v9 — current scaffold ships `src/App.tsx`, `src/index.css`, `src/assets/react.svg`, `public/icons.svg`, `public/favicon.svg`. Keep `favicon.svg` (it's referenced by `index.html` and is a clean default); remove everything else demo-related:
 
 ```bash
-rm -f src/App.css src/App.tsx src/counter.ts src/style.css
-rm -rf src/assets public/vite.svg
+rm -f src/App.css src/App.tsx src/style.css src/counter.ts
+rm -rf src/assets
+rm -f public/icons.svg public/vite.svg     # vite.svg only existed in older create-vite; rm -f is safe either way
 ```
 
 Make the app dirs and copy the canonical skeleton:
@@ -195,7 +196,7 @@ Change the `<title>` to the project name (the workspace folder basename):
 <title>my-app</title>
 ```
 
-Drop the favicon link if there's no `public/favicon.svg` (you deleted `public/vite.svg`).
+`public/favicon.svg` is kept by Step 8, so the existing `<link rel="icon" type="image/svg+xml" href="/favicon.svg" />` in `index.html` works as-is. No edit needed beyond the title.
 
 ### Step 10 — Add app `name` + scripts to `package.json`
 

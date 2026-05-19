@@ -269,7 +269,7 @@ Merge these into `package.json` (preserve any existing entries):
     "**/*.{ts,tsx,js,jsx,mjs,cjs}": [
       "npx eslint --max-warnings 0 --no-warn-ignored"
     ],
-    "**/*.{json,md,yaml,yml,toml,css,html}": [
+    "**/*.{json,md,yaml,yml,css,html}": [
       "npx prettier --check"
     ],
     "**/package-lock.json": [
@@ -280,6 +280,8 @@ Merge these into `package.json` (preserve any existing entries):
 ```
 
 Note: secret scanning is **not** in `lint-staged` — `gitleaks` runs in `.husky/pre-commit` directly (Step 8) so it sees the full staged set, not lint-staged's per-glob slices.
+
+Important: **don't add `toml` to the prettier glob.** Prettier 3.x ships no TOML parser; `prettier --check` errors with *"No parser could be inferred"* on `.osv-scanner.toml` (this skill's Step 6) and `supabase/config.toml` (supabase init's output). Every first commit would die. If you genuinely want formatted TOML, add `prettier-plugin-toml` to devDeps and wire it in `.prettierrc` — heavier than worth it for two configs that aren't hand-edited often.
 
 ### Step 8 — Wire husky
 

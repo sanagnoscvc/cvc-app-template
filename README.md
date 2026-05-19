@@ -42,6 +42,29 @@ Claude will then:
 4. Wire `scripts/check-patterns.sh` into the gate so the `check-patterns` Claude skill is enforced on every commit
 5. Scaffold the stack itself
 
+### Example prompt: minimal React + Supabase app
+
+Open Claude Code in an empty directory on your machine and paste:
+
+```
+Set me up a tiny internal-tool starter. Backend-less, Supabase auth, React/Vite SPA — nothing fancy.
+
+Use `sanagnoscvc/cvc-app-template` (private repo) as the base. It ships Claude-runnable skills (`setup-vite-react-stack`, `setup-ts-flavor`, `setup-supabase-stack`) and a `CLAUDE.md` explaining how they compose. Clone it into `./my-app`, read the `CLAUDE.md` before touching anything, then run the skills in whatever order it recommends.
+
+What I need in the app:
+- Login page (email + password)
+- Protected `/` route — dashboard that shows "Welcome, [display_name]" pulled from `public.user_profiles`
+- Logout button
+
+Should work end-to-end with the seeded `admin@localhost.local` / `admin1234` user once I rebuild the devcontainer in VS Code.
+
+Pre-commit pipeline gates on lint + secrets + dep vulns + a pattern audit. Don't `--no-verify`. If anything in the skills is ambiguous or broken, surface it — we want the harness improved, not papered over.
+```
+
+Claude will clone the template, follow the three skills in the recommended order, scaffold the app, and tell you to rebuild the dev container. After the rebuild, `npm run dev` → http://localhost:8080 → log in as `admin@localhost.local` / `admin1234` → land on the dashboard with "Welcome, Admin User".
+
+If anything goes sideways, Claude is instructed to **surface the gap rather than paper over it** — please copy that feedback into a GitHub issue against this repo so the skills can be tightened.
+
 ## The hooks contract
 
 Every CVC app committed from a clone of this template runs the same five gates on every commit:

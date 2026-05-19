@@ -33,7 +33,17 @@ The first four are universal — same intent across every CVC app. The fifth is 
 
 ## When the user asks you to bootstrap a stack
 
-Your job is to wire the contract above into whatever framework is idiomatic for their language. **Prefer invoking the flavor skills below** — they encode the deterministic install + config steps so you don't re-derive them each session.
+Your job is to wire the contract above into whatever framework is idiomatic for their language. **Prefer invoking the skills below** — they encode the deterministic install + config steps so you don't re-derive them each session.
+
+### Recommended order for compound stacks
+
+When the user asks for something like *"React + Supabase"*, run skills in this order:
+
+1. **Stack interface skill** — scaffolds the application framework (e.g. `setup-vite-react-stack` creates `package.json` + `vite.config.ts` + the React app skeleton).
+2. **Flavor skill** — adds the harness (lint, hooks, complexity gates, secret scan). For TS/JS: `setup-ts-flavor`. For Python: `setup-python-flavor`. The flavor skill detects what the stack skill already installed (e.g. Vite + React's ESLint plugins) and composes rather than overwriting.
+3. **Stack storage / backend skill** — wires the data layer (e.g. `setup-supabase-stack` runs `supabase init` + drops the foundation migration + patches devcontainer for ports).
+
+Why this order: the flavor skill's ESLint config branches on whether React is present in `package.json`. If the flavor runs first, it writes a non-React config; the stack skill then has to either re-merge React rules or you ship without them. Doing stack-first avoids that whole class of issue.
 
 ### TypeScript / JavaScript
 

@@ -219,10 +219,12 @@ All three should pass. If `npm install` errors with `ERESOLVE` mentioning `eslin
 
 > "Vite + React scaffold complete. Pre-rebuild sanity checks all passed (type-check, build).
 >
-> Outstanding (in order):
-> - If `setup-ts-flavor` hasn't run yet, run it now to add husky + lint-staged + complexity gates + the pattern-check gate.
-> - If `setup-supabase-stack` hasn't run yet, run it now so the auth glue has a backend to talk to. Without it, the app boots but `.env.local` is missing and login fails with a 'Missing Supabase env vars' error.
-> - Then rebuild the dev container so the supabase stack's post-create patches kick in (`supabase start` + `.env.local` generation)."
+> Note: the scaffold's `tsconfig.json` and `index.html` ship without trailing newlines / with default prettier-incompatible formatting. The TS flavor skill will run `prettier --write` across the project (Step 9 of that skill) which normalizes everything — so don't worry about formatting here.
+>
+> Outstanding (in this order):
+> - **Run `setup-ts-flavor`** next to add husky + lint-staged + complexity gates + the pattern-check gate + the `.prettierrc` that the lint-staged `prettier --check` depends on. (The TS-flavor skill detects this is a Vite+React project and preserves the React-specific ESLint plugins.)
+> - **Run `setup-supabase-stack`** to wire the auth backend. Without it, the app boots but `.env.local` is missing and login fails with 'Missing Supabase env vars'.
+> - **Rebuild the dev container** so post-create patches kick in: gitleaks + osv-scanner binaries install, `supabase start` runs, `.env.local` is written."
 
 ## What you've added
 

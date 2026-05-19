@@ -3,8 +3,11 @@ name: setup-ts-flavor
 description: |
   **TypeScript/JavaScript Flavor Bootstrap**: Wires the CLAUDE.md hooks contract
   into a TS/JS project using husky + lint-staged (npm-native idiom). Installs
-  ESLint complexity gates, secretlint, osv-scanner, prettier, vitest. Wires the
-  check-patterns gate into the husky pre-commit hook.
+  ESLint complexity gates, prettier, vitest. Patches post-create.sh to install
+  gitleaks (broad secret-scan gate) and osv-scanner (lockfile-vuln gate) inside
+  the dev container. Wires the check-patterns gate into the husky pre-commit
+  hook. If the project also has Vite + React (detected via vite.config.ts),
+  preserves the React-specific ESLint plugins instead of overwriting them.
   Trigger: user asks to "set up TS", "bootstrap TypeScript", "configure JS
   flavor", or names a TS/JS stack in a fresh clone (e.g. "set me up for
   TS + Supabase", "Vite + React project").
@@ -76,7 +79,20 @@ We deliberately do **not** use `secretlint` (npm package) — its default config
 
 ### Step 3 — Write `eslint.config.js`
 
-Write this file at the repo root (adapt the globals based on the runtime decision):
+**Detection first.** Check whether Vite + React are already scaffolded (typically via `setup-vite-react-stack` running before this skill):
+
+```bash
+has_react=0
+if grep -q '"vite"' package.json 2>/dev/null && grep -q '"react"' package.json 2>/dev/null; then
+  has_react=1
+fi
+```
+
+Pick the config variant accordingly and write `eslint.config.js` at the repo root.
+
+#### Variant A — vanilla TS (no React)
+
+Use when `has_react=0` (pure TS library, CLI, Node service, etc.):
 
 ```js
 import globals from "globals";
@@ -88,23 +104,13 @@ import importPlugin from "eslint-plugin-import";
 export default [
   {
     ignores: [
-      "**/node_modules/**",
-      "**/dist/**",
-      "**/build/**",
-      "**/coverage/**",
-      "**/*.min.*",
-      "**/*.d.ts",
+      "**/node_modules/**", "**/dist/**", "**/build/**",
+      "**/coverage/**", "**/*.min.*", "**/*.d.ts",
     ],
   },
   {
     languageOptions: {
-      globals: {
-        // PICK BASED ON RUNTIME DECISION:
-        // browser: { ...globals.browser }
-        // node:    { ...globals.node }
-        // both:    { ...globals.browser, ...globals.node }
-        ...globals.node,
-      },
+      globals: { ...globals.node },   // swap to browser / both based on runtime
       ecmaVersion: "latest",
       sourceType: "module",
     },
@@ -115,27 +121,77 @@ export default [
   {
     files: ["src/**/*.ts", "src/**/*.tsx"],
     rules: {
-      // File and function size
       "max-lines": ["error", { max: 300, skipBlankLines: true, skipComments: true }],
       "max-lines-per-function": ["error", { max: 60, skipBlankLines: true, skipComments: true, IIFEs: true }],
-
-      // Logical complexity
       "complexity": ["error", 12],
       "max-depth": ["error", 4],
       "max-nested-callbacks": ["error", 3],
       "max-params": ["error", 4],
       "max-statements": ["error", 25],
-
-      // Refactor pressure
       "sonarjs/cognitive-complexity": ["error", 15],
       "sonarjs/no-duplicated-branches": "error",
       "sonarjs/no-identical-functions": "error",
-
-      // Modularity
       "import/max-dependencies": ["error", { max: 25, ignoreTypeImports: true }],
       "import/no-cycle": "warn",
+      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
+      "@typescript-eslint/no-explicit-any": "warn",
+    },
+  },
+];
+```
 
-      // TS strictness
+#### Variant B — Vite + React
+
+Use when `has_react=1`. Same complexity gates, but adds `eslint-plugin-react-hooks` + `eslint-plugin-react-refresh` (Vite already installed these in your `setup-vite-react-stack` run; this config wires them up rather than dropping them):
+
+```js
+import globals from "globals";
+import pluginJs from "@eslint/js";
+import tseslint from "typescript-eslint";
+import sonarjs from "eslint-plugin-sonarjs";
+import importPlugin from "eslint-plugin-import";
+import reactHooks from "eslint-plugin-react-hooks";
+import reactRefresh from "eslint-plugin-react-refresh";
+
+export default [
+  {
+    ignores: [
+      "**/node_modules/**", "**/dist/**", "**/build/**",
+      "**/coverage/**", "**/*.min.*", "**/*.d.ts",
+    ],
+  },
+  {
+    languageOptions: {
+      globals: { ...globals.browser },
+      ecmaVersion: "latest",
+      sourceType: "module",
+    },
+    plugins: { sonarjs, import: importPlugin },
+  },
+  pluginJs.configs.recommended,
+  ...tseslint.configs.recommended,
+  {
+    files: ["src/**/*.ts", "src/**/*.tsx"],
+    plugins: {
+      "react-hooks": reactHooks,
+      "react-refresh": reactRefresh,
+    },
+    rules: {
+      ...reactHooks.configs.recommended.rules,
+      "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
+
+      "max-lines": ["error", { max: 300, skipBlankLines: true, skipComments: true }],
+      "max-lines-per-function": ["error", { max: 60, skipBlankLines: true, skipComments: true, IIFEs: true }],
+      "complexity": ["error", 12],
+      "max-depth": ["error", 4],
+      "max-nested-callbacks": ["error", 3],
+      "max-params": ["error", 4],
+      "max-statements": ["error", 25],
+      "sonarjs/cognitive-complexity": ["error", 15],
+      "sonarjs/no-duplicated-branches": "error",
+      "sonarjs/no-identical-functions": "error",
+      "import/max-dependencies": ["error", { max: 25, ignoreTypeImports: true }],
+      "import/no-cycle": "warn",
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
       "@typescript-eslint/no-explicit-any": "warn",
     },
@@ -167,7 +223,25 @@ If not present:
 
 Drop `jsx` if the project isn't React. Adjust `target`/`module` per runtime.
 
-### Step 5 — (skipped — no secretlint; `gitleaks` is used instead, see Step 8b)
+### Step 5 — Write `.prettierrc`
+
+Critical — without this file, `prettier --check` (run inside `lint-staged`, Step 7) fails on every first commit because:
+
+- Default prettier wants double quotes
+- The skill assets (and CVC convention) use single quotes
+- So a clean install with default prettier blocks every commit until someone adds `.prettierrc`
+
+Ship it with the skill:
+
+```json
+{
+  "singleQuote": true,
+  "trailingComma": "all",
+  "printWidth": 100
+}
+```
+
+(Previously this skill's Step 5 was a `.secretlintrc.json` write — secretlint is no longer used, gitleaks replaces it in Step 8b.)
 
 ### Step 6 — Write `.osv-scanner.toml`
 
@@ -275,34 +349,42 @@ fi
 
 Find the marker `# === BEGIN flavor-tooling hooks (appended by setup-*-flavor skills) ===` and insert this block above the `# === END flavor-tooling hooks ===` line. **Pin versions** as shown above — never `latest`. To bump, update `GITLEAKS_VERSION` / `OSV_SCANNER_VERSION` in the block.
 
-### Step 9 — Verify
+### Step 9 — Format the working tree
 
-Stage a trivial change and attempt a commit:
+Before the user attempts a commit, run prettier across the project so the lint-staged `prettier --check` doesn't block on pre-existing scaffold drift (Vite's `tsconfig.json` ships without trailing newlines, etc.):
 
 ```bash
-echo "// touched" >> src/index.ts   # or any staged file
-git add .
-git commit -m "test: verify pre-commit pipeline"
+npx prettier --write \
+  'src/**/*.{ts,tsx,css,json}' \
+  'index.html' 'package.json' 'tsconfig*.json' \
+  'eslint.config.js' 'vite.config.ts' 'README.md' 2>/dev/null || true
 ```
 
-You should see:
+`|| true` because not all paths will exist in every project (e.g. no `vite.config.ts` in a Node-only project). Prettier only formats what it finds.
 
-1. `lint-staged` running secretlint + eslint on staged files
-2. osv-scanner running on the lockfile (if present)
-3. The pattern-check gate printing its banner and blocking the commit
+### Step 10 — Verify
 
-That's the expected end-state — the gate refuses because `.patterns-checked` doesn't exist yet. Tell the user:
+The Go-binary gates (gitleaks, osv-scanner) are installed by `post-create.sh` inside the dev container on rebuild — they're **not** on the host (macOS, Linux WSL, etc.). So **don't try to run `git commit` from the host** as a verification step; it'll fail with "command not found: gitleaks." Instead:
 
-> "TS flavor wired. Try a commit — pre-commit will run lint-staged then block on the pattern gate. Run `/check-patterns` to audit and stamp, then retry the commit."
+- Run `npm run lint` — should pass (eslint config + complexity gates).
+- Run `npm run build` — should compile cleanly.
+- Run `npx prettier --check '**/*.{ts,tsx,json,md,css}' 'eslint.config.js'` — should report "All matched files use Prettier code style!"
+
+Tell the user:
+
+> "TS flavor wired. Verify on host: `npm run lint && npm run build` should both pass. Don't attempt a commit on the host — gitleaks + osv-scanner only install inside the dev container on rebuild. After the rebuild, the first commit inside the container will exercise all four pre-commit gates; the pattern gate will refuse until `/check-patterns` stamps."
 
 ## What you've added
 
 ```
 package.json                       ← scripts + devDeps + lint-staged config
 package-lock.json                  ← (auto)
-eslint.config.js                   ← complexity gates
-tsconfig.json
+eslint.config.js                   ← complexity gates (+ React plugins if Vite)
+tsconfig.json                      ← (only if absent — Vite's takes precedence)
 .osv-scanner.toml
+.prettierrc                        ← singleQuote + trailingComma + printWidth
+                                     (CVC convention; without this, prettier
+                                     --check fails on every first commit)
 .husky/pre-commit                  ← 4-step: merge-markers → gitleaks →
                                      lint-staged → patterns gate
 .devcontainer/post-create.sh       ← patched: pinned gitleaks + osv-scanner

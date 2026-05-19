@@ -21,13 +21,13 @@ What does **not** ship: any pre-commit framework, any language tooling, any depe
 
 Every commit, in every CVC app cloned from this template, **must** be gated by these checks:
 
-| # | Category | What it does | Why |
-|---|---|---|---|
-| 1 | **Secret scanning** | Block API keys, tokens, credentials in staged files | Prevent credential leaks to git history |
-| 2 | **Dependency vulnerability scanning** | Block commits introducing known-vulnerable deps | Stop CVEs at the source |
-| 3 | **File hygiene** | No trailing whitespace, valid JSON/YAML/TOML, no merge markers, file-size limits | Clean diffs, no syntax foot-guns |
-| 4 | **Pattern audit** (`check-patterns`) | Refuse commit until you've audited the staged diff for duplicated/defensive code | Highest-leverage Claude-discipline gate |
-| 5 | **Lint + complexity gates** | Language-specific rules (file size, function complexity, nesting depth, etc.) | Stops monster files / functions before they grow |
+| #   | Category                              | What it does                                                                     | Why                                              |
+| --- | ------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------ |
+| 1   | **Secret scanning**                   | Block API keys, tokens, credentials in staged files                              | Prevent credential leaks to git history          |
+| 2   | **Dependency vulnerability scanning** | Block commits introducing known-vulnerable deps                                  | Stop CVEs at the source                          |
+| 3   | **File hygiene**                      | No trailing whitespace, valid JSON/YAML/TOML, no merge markers, file-size limits | Clean diffs, no syntax foot-guns                 |
+| 4   | **Pattern audit** (`check-patterns`)  | Refuse commit until you've audited the staged diff for duplicated/defensive code | Highest-leverage Claude-discipline gate          |
+| 5   | **Lint + complexity gates**           | Language-specific rules (file size, function complexity, nesting depth, etc.)    | Stops monster files / functions before they grow |
 
 The first four are universal — same intent across every CVC app. The fifth is language-specific and you set it up per the chosen flavor.
 
@@ -37,7 +37,7 @@ Your job is to wire the contract above into whatever framework is idiomatic for 
 
 ### Recommended order for compound stacks
 
-When the user asks for something like *"React + Supabase"*, run skills in this order:
+When the user asks for something like _"React + Supabase"_, run skills in this order:
 
 1. **Stack interface skill** — scaffolds the application framework (e.g. `setup-vite-react-stack` creates `package.json` + `vite.config.ts` + the React app skeleton).
 2. **Flavor skill** — adds the harness (lint, hooks, complexity gates, secret scan). For TS/JS: `setup-ts-flavor`. For Python: `setup-python-flavor`. The flavor skill detects what the stack skill already installed (e.g. Vite + React's ESLint plugins) and composes rather than overwriting.
@@ -92,7 +92,7 @@ The dev container is configured for the user's own development convenience, **no
 - The host's Docker socket is mounted (DooD) — code in the container can launch sibling containers on the host's Docker.
 - `npm install` runs automatically on container rebuild if `package.json` exists. This executes `postinstall` scripts in npm packages.
 
-A malicious npm package's `postinstall` could read host credentials via the bind mounts and drive Docker via the socket. **This is the same exposure you'd have running `npm install` on the host directly** — the dev container is not stronger isolation, just a *consistency boundary* (same Node version, same system deps, same tooling for every teammate).
+A malicious npm package's `postinstall` could read host credentials via the bind mounts and drive Docker via the socket. **This is the same exposure you'd have running `npm install` on the host directly** — the dev container is not stronger isolation, just a _consistency boundary_ (same Node version, same system deps, same tooling for every teammate).
 
 If you need stronger isolation for genuinely untrusted code (running an AI-generated script you don't trust, executing user-uploaded code, etc.), use a Vercel Sandbox, ephemeral cloud container, or VM — not this dev container.
 
@@ -125,6 +125,7 @@ When you invoke a stack skill, it's responsible for **all** of the following:
    ```
 
    Flavor-tooling runs first so stack hooks can rely on the tooling being in place. Multiple skills compose within each block by appending to it.
+
 4. **Modifying `package.json` / `pyproject.toml`** to add stack-specific deps.
 5. **Prompting the user to rebuild the dev container** at the end, so the devcontainer changes take effect.
 
@@ -150,6 +151,6 @@ When running via the Action:
 
 - **Don't soften the hooks contract** to make commits faster. Lower bars for "convenience" defeat the purpose.
 - **Don't pick a framework the user's stack doesn't naturally use** (e.g. installing the `pre-commit` Python tool in a pure Node project just because you've used it before). Match the idiom.
-- **Don't add application code to this template repo**. v0 is harness-only. Stack-specific work happens in repos *cloned from* this one, not inside it.
+- **Don't add application code to this template repo**. v0 is harness-only. Stack-specific work happens in repos _cloned from_ this one, not inside it.
 - **Don't add stack-specific files to the base harness** (e.g. supabase/, vite.config.ts, pyproject.toml). Those belong in skills, not in the base. The post-create.sh and devcontainer.json should stay stack-agnostic until a stack skill patches them.
 - **Don't rewrite `check-patterns.sh` or the `check-patterns` skill**. They're the canonical artifacts. Wire them in; don't re-derive them.

@@ -49,7 +49,8 @@ if [ "$HAS_REACT" = "1" ]; then
 else
   cp .claude/skills/setup-ts-flavor/assets/eslint.config.vanilla.js ./eslint.config.js
 fi
-cp .claude/skills/setup-ts-flavor/assets/.prettierrc      ./.prettierrc
+cp .claude/skills/setup-ts-flavor/assets/.prettierrc       ./.prettierrc
+cp .claude/skills/setup-ts-flavor/assets/.prettierignore   ./.prettierignore
 cp .claude/skills/setup-ts-flavor/assets/.osv-scanner.toml ./.osv-scanner.toml
 ```
 
@@ -62,9 +63,15 @@ If a framework scaffold already wrote one (e.g. Vite did), skip. Otherwise:
 ```json
 {
   "compilerOptions": {
-    "target": "ES2022", "module": "ESNext", "moduleResolution": "Bundler",
-    "strict": true, "esModuleInterop": true, "skipLibCheck": true,
-    "resolveJsonModule": true, "isolatedModules": true, "noEmit": true
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true
   },
   "include": ["src/**/*"]
 }

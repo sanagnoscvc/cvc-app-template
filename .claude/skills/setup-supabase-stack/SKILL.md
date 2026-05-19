@@ -128,14 +128,21 @@ supabase/.branches/
 ### 7. Add `db:types` script to `package.json`
 
 ```json
-{ "scripts": { "db:types": "npx supabase gen types typescript --local > src/integrations/supabase/types.ts" } }
+{
+  "scripts": {
+    "db:types": "supabase gen types typescript --local > src/integrations/supabase/types.ts"
+  }
+}
 ```
+
+(No `npx` prefix — `supabase` is a project devDep, so npm puts `node_modules/.bin/supabase` on PATH when running the script.)
 
 Run it after rebuild when the local DB is up.
 
 ### 8. Hand-off message
 
 > "Supabase wired. Rebuild the dev container (F1 → Dev Containers: Rebuild Container). First rebuild pulls ~10 images. After it's up:
+>
 > - http://localhost:54321 — API
 > - http://localhost:54323 — Studio
 > - http://localhost:54324 — Mailpit (catches auth emails — set `[inbucket].enabled = false` in `supabase/config.toml` to disable)

@@ -31,17 +31,32 @@ export function LoginPage() {
         <h1 className="text-xl font-semibold text-gray-900">Sign in</h1>
         <label className="block text-sm font-medium text-gray-700">
           Email
-          <input type="email" autoComplete="email" required value={email}
-            onChange={(e) => setEmail(e.target.value)} className={inputCls} />
+          <input
+            type="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={inputCls}
+          />
         </label>
         <label className="block text-sm font-medium text-gray-700">
           Password
-          <input type="password" autoComplete="current-password" required value={password}
-            onChange={(e) => setPassword(e.target.value)} className={inputCls} />
+          <input
+            type="password"
+            autoComplete="current-password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className={inputCls}
+          />
         </label>
         {error && <p className="text-sm text-red-600">{error}</p>}
-        <button type="submit" disabled={submitting}
-          className="w-full rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60">
+        <button
+          type="submit"
+          disabled={submitting}
+          className="w-full rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+        >
           {submitting ? 'Signing in…' : 'Sign in'}
         </button>
       </form>

@@ -37,6 +37,7 @@ Look for staged code that papers over upstream inconsistencies instead of fixing
 ## Procedure
 
 1. **Get the staged diff:**
+
    ```bash
    git diff --cached --name-only
    git diff --cached

@@ -1,0 +1,18 @@
+# Files prettier can't reliably parse — skip them in `--check` and `--write`.
+
+# JSONC (JSON with // comments) — prettier-3 parses as strict JSON.
+.devcontainer/devcontainer.json
+**/tsconfig*.json
+
+# TOML — prettier-3 has no built-in TOML parser (would also be caught by
+# our lint-staged glob, but defense in depth).
+**/*.toml
+
+# Build / cache outputs
+**/dist/**
+**/build/**
+**/coverage/**
+**/node_modules/**
+**/.vite/**
+package-lock.json
+yarn.lock

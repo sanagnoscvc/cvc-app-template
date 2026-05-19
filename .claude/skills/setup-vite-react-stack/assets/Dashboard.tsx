@@ -19,8 +19,15 @@ export function Dashboard() {
         .eq('id', uid)
         .single();
       if (cancelled) return;
-      if (dbErr) setError(dbErr.message);
-      else setDisplayName(data?.display_name ?? '');
+      if (dbErr) {
+        setError(dbErr.message);
+        return;
+      }
+      // user_profiles.display_name is NOT NULL DEFAULT '' and the row is
+      // auto-provisioned by handle_new_user() in the auth.users INSERT
+      // trigger — same transaction, so it's always present when this query
+      // runs post-sign-in. No defensive ?? '' needed.
+      setDisplayName(data.display_name);
     })();
     return () => {
       cancelled = true;

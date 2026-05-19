@@ -9,7 +9,7 @@ A Claude-driven starting point for building internal-tool apps at CVC. Clone thi
 A **stack-agnostic Claude harness** + a small set of language / stack bootstrap skills. Cloning gets you:
 
 - **Dev container** (`.devcontainer/`) — Reopen in Container in VS Code and you get Node 22, gh CLI, zsh, the Docker socket (DooD), `--network=host` for Supabase compatibility, and a path-aligned workspace mount. Works on Mac and Windows Docker Desktop. Stack-agnostic: post-create only installs npm deps and starts Supabase if the workspace already has them.
-- **AI-code attribution** ([`git-ai`](https://usegitai.com)) — installed by post-create. Auto-tags each commit with the AI agent + prompt that produced each line; survives rebases/merges via Git Notes. Local-first; no telemetry leaves the container. Use `/who-wrote-this <file>` from Claude Code, or `git ai blame <file>` directly. Useful for PR review (*"this PR is 80% AI — extra eyes"*) and post-hoc bug audits.
+- **AI-code attribution** ([`git-ai`](https://usegitai.com)) — installed by post-create. Auto-tags each commit with the AI agent + prompt that produced each line; survives rebases/merges via Git Notes. Local-first; no telemetry leaves the container. Use `/who-wrote-this <file>` from Claude Code, or `git ai blame <file>` directly. Useful for PR review (_"this PR is 80% AI — extra eyes"_) and post-hoc bug audits.
 - **The `check-patterns` Claude skill** — encoded review pass Claude runs before each commit to flag duplicated logic and defensive shims
 - **The `check-patterns.sh` gate script** — blocks commits until the audit has run (paired with whatever pre-commit framework Claude wires up for your stack)
 - **Flavor bootstrap skills** — `setup-ts-flavor` and `setup-python-flavor` encode the deterministic install + config steps for each language family, so Claude doesn't re-derive them every time
@@ -18,7 +18,7 @@ A **stack-agnostic Claude harness** + a small set of language / stack bootstrap 
 - **`CLAUDE.md`** — Claude's constitution for working in CVC apps. Defines the **hooks contract** (what every commit must be gated on) and points Claude at the right flavor skill per stack
 - **A multi-language `.gitignore`** baseline
 
-No `package.json`, no `pyproject.toml`, no `.pre-commit-config.yaml`. The harness is *the rules*; Claude picks the *tooling* at bootstrap time to match your stack.
+No `package.json`, no `pyproject.toml`, no `.pre-commit-config.yaml`. The harness is _the rules_; Claude picks the _tooling_ at bootstrap time to match your stack.
 
 ## Quick start
 
@@ -70,13 +70,13 @@ If anything goes sideways, Claude is instructed to **surface the gap rather than
 
 Every CVC app committed from a clone of this template runs the same five gates on every commit:
 
-| Gate | Purpose |
-|---|---|
-| Secret scanning | Catches API keys, tokens, credentials in staged files |
-| Dependency vulnerability scan | Blocks commits that introduce known-vulnerable deps |
-| File hygiene | Trailing whitespace, JSON/YAML/TOML syntax, large files, merge markers |
-| **Pattern audit** | Refuses to commit until Claude has audited the staged diff for duplicated logic and unnecessary fallbacks |
-| Lint + complexity gates | Language-specific: file size, function complexity, nesting depth |
+| Gate                          | Purpose                                                                                                   |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Secret scanning               | Catches API keys, tokens, credentials in staged files                                                     |
+| Dependency vulnerability scan | Blocks commits that introduce known-vulnerable deps                                                       |
+| File hygiene                  | Trailing whitespace, JSON/YAML/TOML syntax, large files, merge markers                                    |
+| **Pattern audit**             | Refuses to commit until Claude has audited the staged diff for duplicated logic and unnecessary fallbacks |
+| Lint + complexity gates       | Language-specific: file size, function complexity, nesting depth                                          |
 
 The first four are universal. The fifth is set up to match your language. See [`CLAUDE.md`](./CLAUDE.md) for the full contract and the per-language recommendations Claude uses.
 
@@ -131,7 +131,7 @@ Claude runs on a GitHub Actions runner. Depending on the task, it may push commi
 **One-time setup per repo:**
 
 1. Install the [Claude GitHub App](https://github.com/apps/claude)
-2. Get an Anthropic API key at [console.anthropic.com](https://console.anthropic.com/settings/keys). Add it as a repo secret named `ANTHROPIC_API_KEY` at `Settings → Secrets and variables → Actions`. *(Pro/Max subscribers can use OAuth instead — see the commented section in `.github/workflows/claude.yml`.)*
+2. Get an Anthropic API key at [console.anthropic.com](https://console.anthropic.com/settings/keys). Add it as a repo secret named `ANTHROPIC_API_KEY` at `Settings → Secrets and variables → Actions`. _(Pro/Max subscribers can use OAuth instead — see the commented section in `.github/workflows/claude.yml`.)_
 3. Push `main`. Claude is now triggerable.
 
 Billed as GitHub Actions minutes + Anthropic API tokens (or subscription quota if using OAuth).

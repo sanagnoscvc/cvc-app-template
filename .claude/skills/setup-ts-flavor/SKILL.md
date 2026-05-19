@@ -290,11 +290,16 @@ npx husky init
 That creates `.husky/pre-commit` with a default `npm test` line. Replace its contents with:
 
 ```bash
-# 1. Catch unresolved merge markers in any staged file (file-hygiene gate).
-git diff --check --cached || {
-  echo "Unresolved merge markers in staged files." >&2
+# 1. File-hygiene gate. `git diff --check --cached` flags trailing
+#    whitespace, mixed tabs/spaces, AND unresolved merge markers in
+#    staged files. Don't wrap its output — git prints file:line info
+#    we want the user to see.
+if ! git diff --check --cached; then
+  echo "" >&2
+  echo "✗ Whitespace errors or merge markers in staged files (see above)." >&2
+  echo "  Most common fix:  npx prettier --write <file>  &&  git add <file>" >&2
   exit 1
-}
+fi
 
 # 2. Broad secret scanning across ALL staged files (not just JS/TS).
 gitleaks protect --staged --no-banner --verbose
@@ -304,7 +309,7 @@ gitleaks protect --staged --no-banner --verbose
 npx lint-staged
 
 # 4. Pattern audit gate — hash-bound to the staged diff after lint-staged.
-#    Re-runs are required if lint-staged --fix-mutates anything.
+#    Re-runs are required if lint-staged --fix mutates anything.
 bash scripts/check-patterns.sh
 ```
 

@@ -1,0 +1,109 @@
+{
+  "name": "cvc-app",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
+
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "configureZshAsDefaultShell": true,
+      "installOhMyZsh": true,
+      "upgradePackages": true
+    },
+    "ghcr.io/devcontainers/features/git:1": { "ppa": true, "version": "latest" },
+    "ghcr.io/devcontainers/features/github-cli:1": { "version": "latest" },
+    // DooD: mount the host's Docker socket instead of running a nested daemon.
+    // Lets the container launch sibling containers (Supabase stack, test
+    // containers, etc.) without running a nested dockerd that breaks on
+    // Docker Desktop / WSL2.
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": { "version": "latest" }
+  },
+
+  // Bind-mount Claude credentials and SSH keys from the host so they're
+  // available inside the container.
+  "mounts": [
+    "source=${localEnv:HOME}/.claude,target=/home/node/.claude,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/.ssh,target=/home/node/.ssh,type=bind,consistency=cached"
+  ],
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "Anthropic.claude-code",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "bradlc.vscode-tailwindcss",
+        "github.vscode-pull-request-github"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.codeActionsOnSave": {
+          "source.fixAll.eslint": "explicit",
+          "source.organizeImports": "explicit"
+        },
+        "[typescript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+        "[typescriptreact]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+        "tailwindCSS.experimental.classRegex": [
+          ["cva\\(([^)]*)\\)", "[\"'`]([^\"'`]*).*?[\"'`]"],
+          ["cn\\(([^)]*)\\)", "(?:'|\"|`)([^']*)(?:'|\"|`)"]
+        ],
+        "terminal.integrated.defaultProfile.linux": "zsh",
+        // Disable VS Code's JS-debug auto-attach. It injects a NODE_OPTIONS
+        // preload pointing at a per-workspace bootloader.js path that
+        // breaks across container rebuilds and crashes every `node`/`npm`
+        // invocation in the terminal.
+        "debug.javascript.autoAttachFilter": "disabled",
+        "debug.node.autoAttach": "disabled"
+      }
+    }
+  },
+
+  // Runs on every container build. Stack-agnostic: only does work if the
+  // workspace already has a package.json (npm install) or a supabase/
+  // config (start the local stack). On a fresh clone of cvc-app-template
+  // these conditions are false, so post-create is fast and just prints
+  // a "ready, ask Claude to bootstrap" hint.
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+
+  "forwardPorts": [8080, 5173, 54321, 54322, 54323],
+  "portsAttributes": {
+    "8080":  { "label": "Vite dev server (default port)",  "onAutoForward": "notify" },
+    "5173":  { "label": "Vite dev server (alt port)",      "onAutoForward": "silent" },
+    "54321": { "label": "Supabase API",                    "onAutoForward": "silent" },
+    "54322": { "label": "Supabase Postgres",               "onAutoForward": "silent" },
+    "54323": { "label": "Supabase Studio",                 "onAutoForward": "silent" }
+  },
+
+  "remoteEnv": {
+    "ANTHROPIC_API_KEY": "${localEnv:ANTHROPIC_API_KEY}",
+    "SUPABASE_ACCESS_TOKEN": "${localEnv:SUPABASE_ACCESS_TOKEN}"
+  },
+
+  // Make sure host dirs exist before we bind-mount them.
+  "initializeCommand": "mkdir -p ${localEnv:HOME}/.claude ${localEnv:HOME}/.ssh",
+
+  // --network=host: share the host's network namespace so localhost inside
+  // the dev container is the same localhost where -p mappings bind (e.g.
+  // Supabase's host-published ports). Required so the Supabase CLI's
+  // localhost:54322 connection from inside the container actually reaches
+  // postgres. Community-validated pattern: supabase/cli#1939. Works on
+  // Docker Desktop because the "host" we share is the Linux VM where
+  // docker actually runs.
+  "runArgs": ["--network=host"],
+
+  // Mount the workspace at the SAME path inside the container as on the
+  // host. Required for DooD: when a tool inside the container asks the
+  // host's docker to bind-mount workspace files into a sibling container
+  // (e.g. Supabase Studio binds supabase/snippets), docker resolves the
+  // path on the host's filesystem. If container path != host path, the
+  // host can't find it and rejects the mount with "path not shared from
+  // the host." Setting target=${localWorkspaceFolder} aligns them on
+  // both Mac and Windows.
+  "workspaceMount": "source=${localWorkspaceFolder},target=${localWorkspaceFolder},type=bind,consistency=cached",
+  "workspaceFolder": "${localWorkspaceFolder}",
+
+  // node (UID 1000) matches a typical host user UID; vscode (UID 1001
+  // from common-utils) would cause bind-mount permission mismatches on
+  // hosts where the user is UID 1000.
+  "remoteUser": "node"
+}

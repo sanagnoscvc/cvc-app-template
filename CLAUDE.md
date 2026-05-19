@@ -6,9 +6,12 @@ You're working in `cvc-app-template` — a Claude-driven starting point for buil
 
 A **stack-agnostic harness**, not an app. No framework picked, no language assumed. A developer clones it as the starting point of a new project, then asks you to bootstrap their chosen stack on top.
 
-What ships in v0:
+What ships out of the box:
 
+- **Dev container** (`.devcontainer/`) — Node 22 base + DooD socket + `--network=host` + path-aligned workspace mount. Stack-agnostic; post-create only installs npm deps if `package.json` exists and only starts Supabase if `supabase/config.toml` exists.
 - The `check-patterns` skill + slash command + gate script — the discipline that catches duplicated logic and defensive fallbacks before they get committed
+- The `setup-ts-flavor` and `setup-python-flavor` skills — invoke these when the user asks you to bootstrap a stack in the corresponding language
+- The `.github/workflows/claude.yml` Claude GitHub Action — `@claude` triggers from issues/PRs
 - This `CLAUDE.md` — the hooks contract you must satisfy when you bootstrap a stack
 - A multi-language `.gitignore` baseline
 

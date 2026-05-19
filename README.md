@@ -8,6 +8,7 @@ A Claude-driven starting point for building internal-tool apps at CVC. Clone thi
 
 A **stack-agnostic Claude harness**. No pre-installed tooling, no framework assumptions. Cloning gets you:
 
+- **Dev container** (`.devcontainer/`) — Reopen in Container in VS Code and you get Node 22, gh CLI, zsh, the Docker socket (DooD), `--network=host` for Supabase compatibility, and a path-aligned workspace mount. Works on Mac and Windows Docker Desktop. Stack-agnostic: post-create only installs npm deps and starts Supabase if the workspace already has them.
 - **The `check-patterns` Claude skill** — encoded review pass Claude runs before each commit to flag duplicated logic and defensive shims
 - **The `check-patterns.sh` gate script** — blocks commits until the audit has run (paired with whatever pre-commit framework Claude wires up for your stack)
 - **Flavor bootstrap skills** — `setup-ts-flavor` and `setup-python-flavor` encode the deterministic install + config steps for each language family, so Claude doesn't re-derive them every time
@@ -24,9 +25,12 @@ No `package.json`, no `pyproject.toml`, no `.pre-commit-config.yaml`. The harnes
 git clone https://github.com/<org>/cvc-app-template my-new-app
 cd my-new-app
 
-# 2. Open with Claude Code
+# 2. Open in VS Code → Reopen in Container
+code my-new-app
+
+# 3. Inside the container, open Claude Code
 claude
-> "set me up for TS + Supabase"     # or whatever stack
+> "set me up for React + Supabase"     # or whatever stack
 ```
 
 Claude will then:
@@ -66,6 +70,9 @@ This forces every commit through a quality pass without requiring you to remembe
 ```
 cvc-app-template/
 ├── .gitignore                            ← multi-language defaults
+├── .devcontainer/
+│   ├── devcontainer.json                 ← DooD + --network=host + path-aligned mount
+│   └── post-create.sh                    ← stack-agnostic; npm/supabase only if present
 ├── .github/workflows/
 │   └── claude.yml                        ← Claude GitHub Action — @claude in issues/PRs
 ├── scripts/

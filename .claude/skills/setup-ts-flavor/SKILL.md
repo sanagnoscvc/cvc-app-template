@@ -292,9 +292,10 @@ That creates `.husky/pre-commit` with a default `npm test` line. Replace its con
 ```bash
 # 1. File-hygiene gate. `git diff --check --cached` flags trailing
 #    whitespace, mixed tabs/spaces, AND unresolved merge markers in
-#    staged files. Don't wrap its output — git prints file:line info
-#    we want the user to see.
-if ! git diff --check --cached; then
+#    staged files. `--no-pager` so the output doesn't get piped through
+#    `less` (which forces the user to manually `q` out of it before the
+#    hook continues to the next step).
+if ! git --no-pager diff --check --cached; then
   echo "" >&2
   echo "✗ Whitespace errors or merge markers in staged files (see above)." >&2
   echo "  Most common fix:  npx prettier --write <file>  &&  git add <file>" >&2

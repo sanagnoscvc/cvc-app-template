@@ -1,0 +1,18 @@
+# 1. File-hygiene gate. `git diff --check` flags trailing whitespace,
+#    mixed tabs/spaces, and merge markers. --no-pager so its output
+#    isn't piped through `less` (which would block the hook).
+if ! git --no-pager diff --check --cached; then
+  echo "" >&2
+  echo "✗ Whitespace errors or merge markers in staged files (see above)." >&2
+  echo "  Most common fix:  npx prettier --write <file>  &&  git add <file>" >&2
+  exit 1
+fi
+
+# 2. Broad secret scanning across ALL staged files.
+gitleaks protect --staged --no-banner --verbose
+
+# 3. Language-specific lint + formatting + lockfile vuln scan.
+npx lint-staged
+
+# 4. Pattern audit gate — hash-bound to staged diff after lint-staged.
+bash scripts/check-patterns.sh

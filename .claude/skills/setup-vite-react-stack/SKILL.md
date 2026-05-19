@@ -1,254 +1,137 @@
 ---
 name: setup-vite-react-stack
 description: |
-  **Vite + React (+ optional Supabase auth glue) Stack Bootstrap**: scaffolds a
-  Vite + React + TypeScript SPA in a clone of `cvc-app-template`. Sets up the
-  CVC conventions: port 8080, `@` path alias, `@vitejs/plugin-react-swc`,
-  Tailwind v4 via `@tailwindcss/vite`, react-router-dom, and (if Supabase is
-  in scope) the standard `src/integrations/supabase/client.ts` + Login /
-  ProtectedRoute / Dashboard skeleton.
-  Trigger: user asks for a "React + Vite app", "Vite + Supabase", "minimal
-  SPA", or any web frontend in TypeScript on this template.
+  **Vite + React + TS stack**: scaffolds the SPA. Port 8080, `@` path alias,
+  `@vitejs/plugin-react-swc`, Tailwind v4 (via `@tailwindcss/vite`),
+  `react-router-dom`, and the standard Supabase auth glue
+  (`client.ts` + `ProtectedRoute` + `LoginPage` + `Dashboard`).
+  Trigger: "React + Vite app", "Vite + Supabase", "minimal SPA".
 ---
 
-# Vite + React Stack Bootstrap
+# Vite + React Stack
 
-You're scaffolding a Vite + React + TypeScript SPA into a clone of `cvc-app-template`. This skill encodes all the deterministic Vite/React decisions — port, alias, plugin choice, Tailwind setup, app skeleton — so you don't have to re-derive them per project.
+Scaffolds Vite + React + TypeScript in a cloned `cvc-app-template`. Canonical configs live in `assets/`; this skill mostly `cp`s them.
 
-After this skill completes:
-- A working Vite/React + TypeScript project is in place
-- Port 8080, `@` alias, SWC React plugin, Tailwind v4 wired
-- `react-router-dom` installed with routes for `/login` and `/` (protected)
-- If `setup-supabase-stack` has been run (or will be), the auth glue (`client.ts`, `ProtectedRoute`, `LoginPage`, `Dashboard`) is in place
-- All scaffold cruft removed (no `App.css`, no `assets/react.svg`, no demo counter)
+**Order**: run this FIRST in compound bootstraps, before `setup-ts-flavor` and `setup-supabase-stack`. Flavor and Supabase skills detect this scaffold and compose with it.
 
-## Pre-flight
+## Steps
 
-1. Verify you're in a clone of `cvc-app-template`: `CLAUDE.md`, `.devcontainer/devcontainer.json`, `scripts/check-patterns.sh` exist at repo root.
-2. **Detect Vite presence using Vite-specific markers** (not just `package.json` existence — `setup-ts-flavor` creates an empty `package.json` via `npm init -y` and we don't want to mistake that for "Vite already scaffolded"):
-
-   ```bash
-   has_vite=0
-   if [ -f vite.config.ts ] || [ -f vite.config.js ]; then has_vite=1; fi
-   if [ -f package.json ] && grep -q '"vite"' package.json; then has_vite=1; fi
-   if [ -f index.html ] && [ -f src/main.tsx ]; then has_vite=1; fi
-   ```
-
-   - **`has_vite=1`** → skip Step 1 (scaffold). Go straight to Step 2 (customize).
-   - **`has_vite=0`** → run Step 1, even if `package.json` exists (e.g. from `setup-ts-flavor`'s `npm init -y`). Step 1 handles the bare-package.json merge case.
-
-3. **Recommended skill order** (tell the user if there's ambiguity): run **this skill first**, then `setup-ts-flavor`, then `setup-supabase-stack`. Reverse orders work but each combination has caveats — see Step 1's note on merging.
-
-4. Tell the user: *"This skill scaffolds Vite + React + TS, installs Tailwind v4, and wires the standard app skeleton. If you also want Supabase auth, run `setup-supabase-stack` after. If you want the lint/format/test harness, run `setup-ts-flavor` after."*
-
-## Decisions to make
-
-Ask the user (or infer) if unclear:
-
-1. **Supabase auth glue?** — default **yes** for "React + Supabase" prompts. Writes `src/integrations/supabase/client.ts`, `ProtectedRoute`, `LoginPage`, `Dashboard`. If the user wants a different backend (FastAPI, etc.), say no and write only `App.tsx` placeholder.
-
-Don't ask about port, alias, plugin, or Tailwind — those are CVC conventions baked in.
-
-## Procedure
-
-### Step 1 — Scaffold Vite via `/tmp` (non-destructive)
-
-**Do not** run `npm create vite@latest .` in the harness root with `--overwrite` — it wipes `CLAUDE.md`, `.claude/`, `.devcontainer/`, `.github/`, `scripts/`, `README.md`. Scaffold to `/tmp` and copy the framework files in.
+### 1. Pre-flight
 
 ```bash
-rm -rf /tmp/vite-scaffold
-mkdir /tmp/vite-scaffold
-cd /tmp/vite-scaffold
-npm create vite@latest app -- --template react-ts
-cd -   # back to the project root
+[ -f CLAUDE.md ] || { echo "Not in a cvc-app-template clone."; exit 1; }
+HAS_VITE=0
+[ -f vite.config.ts ] || [ -f vite.config.js ] && HAS_VITE=1
+grep -q '"vite"' package.json 2>/dev/null && HAS_VITE=1
+[ -f index.html ] && [ -f src/main.tsx ] && HAS_VITE=1
 ```
 
-**Note**: `react-swc-ts` was removed in `create-vite` v9. Only `react-ts` remains. We swap the plugin manually in Step 3.
+If `HAS_VITE=1`: skip Step 2 (scaffold). Otherwise proceed.
 
-**Handle the existing-package.json case before copying.** If `setup-ts-flavor` ran first, there's already a `package.json` (from `npm init -y`) that may have a custom `"name"` set. Don't blindly overwrite — capture it first:
+### 2. Scaffold via `/tmp` (non-destructive)
+
+**Don't** run `npm create vite@latest .` in the harness — `--overwrite` wipes `CLAUDE.md`, `.claude/`, `.devcontainer/`, etc.
 
 ```bash
+rm -rf /tmp/vite-scaffold && mkdir /tmp/vite-scaffold
+(cd /tmp/vite-scaffold && npm create vite@latest app -- --template react-ts)
+
+# Preserve any existing package.json content
 existing_pkg=""
-if [ -f package.json ]; then
-  existing_pkg=$(cat package.json)
+[ -f package.json ] && existing_pkg=$(cat package.json)
+
+cp -r /tmp/vite-scaffold/app/. ./
+git checkout -- .gitignore README.md 2>/dev/null || true
+rm -rf /tmp/vite-scaffold
+
+# Merge existing package.json (if not bare from `npm init -y`)
+if [ -n "$existing_pkg" ] && echo "$existing_pkg" | grep -q '"scripts"' && echo "$existing_pkg" | grep -q '"lint-staged"\|"husky"'; then
+  echo "$existing_pkg" > /tmp/old-pkg.json
+  jq -s '
+    .[1] as $vite | .[0] as $old |
+    $vite * { scripts: ($vite.scripts + ($old.scripts // {})),
+              dependencies: ($vite.dependencies + ($old.dependencies // {})),
+              devDependencies: ($vite.devDependencies + ($old.devDependencies // {})),
+              "lint-staged": ($old["lint-staged"] // null) }
+  ' /tmp/old-pkg.json package.json > /tmp/merged && mv /tmp/merged package.json
+  rm /tmp/old-pkg.json
 fi
 ```
 
-Copy framework files. If `existing_pkg` was non-empty AND non-bare (has scripts/deps beyond `npm init -y` defaults), refuse and ask the user to either remove `package.json` first or run `setup-vite-react-stack` *before* the other skill. Otherwise overwrite — `npm init -y`'s output has no value to preserve:
+**Note**: `react-swc-ts` was removed in `create-vite` v9. We scaffold `react-ts` and swap the plugin in Step 3.
 
-```bash
-cp -r /tmp/vite-scaffold/app/. ./
-# Restore harness files Vite's template also ships
-git checkout -- .gitignore README.md 2>/dev/null || true
-rm -rf /tmp/vite-scaffold
-```
-
-If `existing_pkg` was substantial (e.g. lint-staged config from `setup-ts-flavor`), then *merge* its `"scripts"`, `"dependencies"`, `"devDependencies"`, and `"lint-staged"` keys into the new Vite `package.json` using `jq`:
-
-```bash
-echo "$existing_pkg" > /tmp/old-pkg.json
-jq -s '
-  .[1] as $vite | .[0] as $old |
-  $vite * { scripts: ($vite.scripts + ($old.scripts // {})),
-            dependencies: ($vite.dependencies + ($old.dependencies // {})),
-            devDependencies: ($vite.devDependencies + ($old.devDependencies // {})),
-            "lint-staged": ($old["lint-staged"] // null) }
-' /tmp/old-pkg.json package.json > package.json.merged
-mv package.json.merged package.json
-rm /tmp/old-pkg.json
-```
-
-After this, the project has both the harness AND a Vite scaffold. `git status` should show ~6-8 new untracked files (`index.html`, `package.json`, `tsconfig*.json`, `vite.config.ts`, `src/`, `public/`, `eslint.config.js`).
-
-### Step 2 — Pin ESLint to ^9 in `package.json`
-
-Vite scaffolds with `eslint@^10` and `@eslint/js@^10`. The TS flavor's `eslint-plugin-import` requires ESLint 9. Update `package.json`:
-
-```json
-{
-  "devDependencies": {
-    "eslint": "^9.36.0",
-    "@eslint/js": "^9.36.0"
-  }
-}
-```
-
-If `setup-ts-flavor` will run later it does this itself; doing it here also avoids a temporary inconsistency if the user runs `npm install` between skills.
-
-### Step 3 — Swap React plugin to SWC
+### 3. Swap plugin + install deps
 
 ```bash
 npm uninstall @vitejs/plugin-react
-npm install -D @vitejs/plugin-react-swc
-```
-
-### Step 4 — Install Tailwind v4
-
-```bash
-npm install -D tailwindcss @tailwindcss/vite
-```
-
-No `tailwind.config.js` or `postcss.config.js` needed — v4 is config-via-CSS.
-
-### Step 5 — Install runtime deps
-
-```bash
+npm install -D @vitejs/plugin-react-swc tailwindcss @tailwindcss/vite
 npm install @supabase/supabase-js react-router-dom
 ```
 
-(Install `@supabase/supabase-js` regardless of whether the Supabase stack will be wired — the client file imports it. If the user explicitly opts out of Supabase glue in pre-flight, skip both installs and skip Step 8.)
+Pin `eslint@^9` if Vite scaffolded ESLint at v10 (causes `ERESOLVE` later with `eslint-plugin-import`):
 
-### Step 6 — Replace `vite.config.ts`
+```bash
+if grep -q '"eslint": "\^10' package.json; then
+  npm install -D "eslint@^9" "@eslint/js@^9"
+fi
+```
 
-Overwrite with the canonical CVC config:
+### 4. Copy canonical configs + app skeleton
 
 ```bash
 cp .claude/skills/setup-vite-react-stack/assets/vite.config.ts ./vite.config.ts
 ```
 
-That sets port 8080, `host: true`, `strictPort: true`, `@` alias to `./src`, and the react-swc + tailwindcss plugins.
-
-### Step 7 — Patch `tsconfig.app.json` to add the `@` path alias
-
-Read the existing `tsconfig.app.json` (Vite scaffolded it) and merge in:
+Add the `@` path alias to `tsconfig.app.json` by merging in:
 
 ```json
-{
-  "compilerOptions": {
-    "paths": {
-      "@/*": ["./src/*"]
-    }
-  }
-}
+{ "compilerOptions": { "paths": { "@/*": ["./src/*"] } } }
 ```
 
-**Don't** add `"baseUrl": "."` — it's deprecated in TS 6 and the path is resolved relative to the tsconfig file by default.
+(Don't add `baseUrl` — deprecated in TS 6.)
 
-### Step 8 — Wipe the demo scaffold and write the app skeleton
+### 5. Wipe Vite demo files; write app skeleton
 
-Remove Vite's demo files. The exact set has shifted in `create-vite` v9 — current scaffold ships `src/App.tsx`, `src/index.css`, `src/assets/react.svg`, `public/icons.svg`, `public/favicon.svg`. Keep `favicon.svg` (it's referenced by `index.html` and is a clean default); remove everything else demo-related:
+`create-vite@9` ships `src/App.tsx`, `src/index.css`, `src/assets/react.svg`, `public/icons.svg`, `public/favicon.svg`. Keep `favicon.svg` (referenced by `index.html`); remove the rest:
 
 ```bash
 rm -f src/App.css src/App.tsx src/style.css src/counter.ts
 rm -rf src/assets
-rm -f public/icons.svg public/vite.svg     # vite.svg only existed in older create-vite; rm -f is safe either way
-```
+rm -f public/icons.svg public/vite.svg   # vite.svg only in older scaffolds — rm -f safe either way
 
-Make the app dirs and copy the canonical skeleton:
-
-```bash
 mkdir -p src/components src/pages src/integrations/supabase
-cp .claude/skills/setup-vite-react-stack/assets/main.tsx                 src/main.tsx
-cp .claude/skills/setup-vite-react-stack/assets/index.css                src/index.css
-cp .claude/skills/setup-vite-react-stack/assets/client.ts                src/integrations/supabase/client.ts
-cp .claude/skills/setup-vite-react-stack/assets/ProtectedRoute.tsx       src/components/ProtectedRoute.tsx
-cp .claude/skills/setup-vite-react-stack/assets/LoginPage.tsx            src/pages/LoginPage.tsx
-cp .claude/skills/setup-vite-react-stack/assets/Dashboard.tsx            src/pages/Dashboard.tsx
+
+cp .claude/skills/setup-vite-react-stack/assets/main.tsx           src/main.tsx
+cp .claude/skills/setup-vite-react-stack/assets/index.css          src/index.css
+cp .claude/skills/setup-vite-react-stack/assets/client.ts          src/integrations/supabase/client.ts
+cp .claude/skills/setup-vite-react-stack/assets/ProtectedRoute.tsx src/components/ProtectedRoute.tsx
+cp .claude/skills/setup-vite-react-stack/assets/LoginPage.tsx      src/pages/LoginPage.tsx
+cp .claude/skills/setup-vite-react-stack/assets/Dashboard.tsx      src/pages/Dashboard.tsx
 ```
 
-If the user opted out of Supabase glue in pre-flight, skip the `client.ts`, `ProtectedRoute.tsx`, `LoginPage.tsx`, `Dashboard.tsx` copies and instead write a minimal `App.tsx` placeholder that gets rendered directly (you'll also need to edit `main.tsx` accordingly).
+If the user opted out of Supabase glue in pre-flight conversation, skip the four Supabase-auth files and write a placeholder `App.tsx` instead.
 
-### Step 9 — Update `index.html` title
+### 6. Update `index.html` title
 
-Change the `<title>` to the project name (the workspace folder basename):
+Change `<title>app</title>` to the workspace folder basename. Don't touch the favicon link — `public/favicon.svg` exists.
 
-```html
-<title>my-app</title>
-```
-
-`public/favicon.svg` is kept by Step 8, so the existing `<link rel="icon" type="image/svg+xml" href="/favicon.svg" />` in `index.html` works as-is. No edit needed beyond the title.
-
-### Step 10 — Add app `name` + scripts to `package.json`
-
-Set `"name"` to the workspace folder basename if Vite scaffolded it as `"app"`.
-
-`setup-ts-flavor` will add the lint/test scripts later (or has already). If neither setup-ts-flavor nor any other skill has touched scripts, ensure at minimum the Vite defaults are present (`dev`, `build`, `preview`).
-
-### Step 11 — Verify
-
-Run the trifecta:
+### 7. Verify
 
 ```bash
-npm install                      # if you haven't already
-npx tsc --noEmit -p tsconfig.app.json   # or `npm run type-check` if scripted
+npm install
+npx tsc --noEmit -p tsconfig.app.json
 npm run build
 ```
 
-All three should pass. If `npm install` errors with `ERESOLVE` mentioning `eslint`, you forgot Step 2 — pin to `^9` and retry.
+All three must pass. Strip the build artifacts: `rm -rf dist`.
 
-### Step 12 — Tell the user what's next
+### 8. Hand-off message
 
-> "Vite + React scaffold complete. Pre-rebuild sanity checks all passed (type-check, build).
->
-> Note: the scaffold's `tsconfig.json` and `index.html` ship without trailing newlines / with default prettier-incompatible formatting. The TS flavor skill will run `prettier --write` across the project (Step 9 of that skill) which normalizes everything — so don't worry about formatting here.
->
-> Outstanding (in this order):
-> - **Run `setup-ts-flavor`** next to add husky + lint-staged + complexity gates + the pattern-check gate + the `.prettierrc` that the lint-staged `prettier --check` depends on. (The TS-flavor skill detects this is a Vite+React project and preserves the React-specific ESLint plugins.)
-> - **Run `setup-supabase-stack`** to wire the auth backend. Without it, the app boots but `.env.local` is missing and login fails with 'Missing Supabase env vars'.
-> - **Rebuild the dev container** so post-create patches kick in: gitleaks + osv-scanner binaries install, `supabase start` runs, `.env.local` is written."
+> "Vite + React scaffolded. Type-check + build pass. Next: run `setup-ts-flavor` (adds the pre-commit pipeline) and `setup-supabase-stack` (wires Supabase auth). Then rebuild the dev container."
 
-## What you've added
+## Constraints
 
-```
-package.json                           ← Vite/React deps, ESLint pinned ^9
-package-lock.json                      ← (auto)
-tsconfig.json, tsconfig.app.json,
-tsconfig.node.json                     ← TS configs (path alias added)
-vite.config.ts                         ← CVC convention: 8080 + @ alias + SWC + Tailwind
-index.html                             ← title set
-src/main.tsx                           ← BrowserRouter + routes
-src/index.css                          ← @import 'tailwindcss';
-src/integrations/supabase/client.ts    ← (if Supabase) the supabase client
-src/components/ProtectedRoute.tsx      ← (if Supabase) auth guard
-src/pages/LoginPage.tsx                ← (if Supabase) email + password form
-src/pages/Dashboard.tsx                ← (if Supabase) welcome + logout
-```
-
-## What NOT to do
-
-- **Don't run `npm create vite@latest .` in the project root**. Use `/tmp` + copy. `--overwrite` flag is destructive in a harness clone.
-- **Don't use the `react-swc-ts` template** — removed in `create-vite` v9. Use `react-ts` and swap the plugin in Step 3.
-- **Don't keep `@vitejs/plugin-react`** — CVC convention is SWC for faster builds.
-- **Don't add `baseUrl` to tsconfig** — deprecated in TS 6, the path is now resolved relative to the tsconfig file.
-- **Don't write the Supabase auth glue if the user explicitly opted out** — write a placeholder `App.tsx` instead so the build still passes.
-- **Don't combine with `setup-supabase-stack` or `setup-ts-flavor` in one go**. Each is independent; the user runs them in whichever order makes sense.
+- Don't use `npm create vite@latest .` directly — scaffold to `/tmp` and copy.
+- Don't use the `react-swc-ts` template (removed in `create-vite` v9). Use `react-ts` and swap the plugin manually.
+- Don't add `baseUrl` to tsconfig.
+- Don't bundle this skill's work with `setup-ts-flavor` or `setup-supabase-stack` in one pass.

@@ -1,0 +1,44 @@
+# Append to project's pyproject.toml under [tool.ruff], [tool.mypy], [tool.pytest.ini_options]:
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = ["build", "dist", ".venv"]
+
+[tool.ruff.lint]
+select = [
+  "E", "F", "W",  # pycodestyle + pyflakes
+  "I",            # isort
+  "N",            # pep8-naming
+  "B",            # flake8-bugbear
+  "C90",          # mccabe complexity
+  "S",            # flake8-bandit (security)
+  "PL",           # pylint conventions
+  "RUF",          # ruff-specific
+]
+ignore = [
+  "S101",         # `assert` (fine in tests)
+  "PLR0913",      # too many args (covered by max-args below)
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 12
+
+[tool.ruff.lint.pylint]
+max-args = 4
+max-branches = 12
+max-returns = 6
+max-statements = 25
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101", "PLR2004"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+
+[tool.pytest.ini_options]
+addopts = "--cov=src --cov-report=term-missing --cov-fail-under=75"
+testpaths = ["tests"]

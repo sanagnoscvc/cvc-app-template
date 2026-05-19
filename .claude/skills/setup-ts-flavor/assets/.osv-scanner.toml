@@ -1,0 +1,4 @@
+# Add vulnerability IDs to ignore here with a written reason.
+# [[IgnoredVulns]]
+# id = "GHSA-xxxx-xxxx-xxxx"
+# reason = "Not applicable: affected codepath is server-only and we run client-only"

@@ -1,0 +1,46 @@
+# Pre-commit hooks for this Python project. Run `pre-commit install` once.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ["--maxkb=1000"]
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+
+  - repo: https://github.com/google/osv-scanner
+    rev: v1.9.2
+    hooks:
+      - id: osv-scanner
+        args: ["-r", "--config=.osv-scanner.toml", "."]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.7.4
+    hooks:
+      - id: ruff
+        args: ["--fix", "--exit-non-zero-on-fix"]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.13.0
+    hooks:
+      - id: mypy
+        additional_dependencies: []
+
+  - repo: local
+    hooks:
+      - id: check-patterns
+        name: Pattern & fallback audit gate
+        entry: bash scripts/check-patterns.sh
+        language: system
+        pass_filenames: false
+        always_run: true

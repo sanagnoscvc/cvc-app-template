@@ -1,185 +1,123 @@
 ---
 name: setup-supabase-stack
 description: |
-  **Supabase Stack Bootstrap**: Adds Supabase (Postgres + Auth + RLS) to a
-  project cloned from `cvc-app-template`. Runs `supabase init`, drops in the
-  CVC foundation migration (app_role enum, user_roles, user_profiles,
-  audit_events, RLS policies, auto-provisioning trigger), patches the
-  devcontainer to forward Supabase ports, patches post-create.sh to run
-  `supabase start` and generate .env.local on rebuild.
-  Trigger: user asks to "add Supabase", "wire up Supabase", or names a
-  Supabase stack (e.g. "React + Supabase", "FastAPI + Supabase").
+  **Supabase stack**: Postgres + Auth + RLS. Adds Supabase CLI as a project
+  dev dep, runs `supabase init`, drops the CVC foundation migration
+  (`app_role`, `user_roles`, `user_profiles`, `audit_events`, RLS,
+  auto-provisioning trigger, redaction-aware audit), seeds two test users,
+  and patches the devcontainer to forward Supabase ports + run
+  `supabase start` on rebuild.
+  Trigger: "add Supabase", "React + Supabase", "FastAPI + Supabase".
 ---
 
-# Supabase Stack Bootstrap
+# Supabase Stack
 
-You're adding Supabase (Postgres + Auth + RLS) to a project that was cloned from `cvc-app-template`. This skill encodes the deterministic install + scaffold + devcontainer-patch steps.
+Wires Supabase into a project that already has the harness + flavor + framework scaffold. Run **last** in compound bootstraps.
 
-After this skill completes:
-- `supabase init` has run
-- A foundation migration is in place (auth users, role enum, profiles, audit framework, RLS policies, auto-provisioning trigger)
-- A seed file with two test users (admin + member) is in place
-- The dev container is patched to forward Supabase's ports and start the local stack on rebuild
-- The user is prompted to rebuild the container
+## Steps
 
-## Pre-flight
+### 1. Pre-flight
 
-1. Verify you're in a directory cloned from `cvc-app-template`: check that `CLAUDE.md`, `.devcontainer/devcontainer.json`, and `scripts/check-patterns.sh` exist at the repo root. If not, stop and tell the user.
-2. Verify a flavor skill has already been applied:
-   - For TS projects: `package.json` exists. If not, run `setup-ts-flavor` first.
-   - For Python projects: `pyproject.toml` exists. If not, run `setup-python-flavor` first.
-3. Verify Supabase isn't already wired: check that `supabase/config.toml` does **not** exist. If it does, the stack is already set up — ask the user what they want done instead (e.g. add a new migration).
-4. **Port collision check**: under DooD, Supabase containers run on the host's docker. If another Supabase project is already running, ports 54321/54322/54323 are taken and `supabase start` will fail with `Bind for 0.0.0.0:54322 failed: port is already allocated`.
+```bash
+[ -f CLAUDE.md ] && [ -f scripts/check-patterns.sh ] || {
+  echo "Not in a cvc-app-template clone."; exit 1;
+}
+[ -f package.json ] || [ -f pyproject.toml ] || {
+  echo "Run setup-ts-flavor or setup-python-flavor first."; exit 1;
+}
+[ -f supabase/config.toml ] && {
+  echo "Supabase already wired here. Ask user how to proceed."; exit 1;
+}
+```
 
-   Check:
-   ```bash
-   docker ps --filter "name=_supabase_db_" --format '{{.Names}}'
-   ```
+**Port collision check** (under DooD, the dev container shares the host's Docker; another running Supabase project will hold the ports):
 
-   If anything is listed, stop and offer the user three options:
+```bash
+running=$(docker ps --filter "name=_supabase_db_" --format '{{.Names}}' 2>/dev/null)
+[ -n "$running" ] && {
+  echo "Sibling Supabase project running: $running"
+  echo "Options: (a) stop it: docker stop \$(docker ps -q --filter 'name=_supabase_')"
+  echo "         (b) shift this project's ports in supabase/config.toml + devcontainer.json"
+  echo "Ask the user which way to go before proceeding."
+  exit 1
+}
+```
 
-   - **Stop the other stack** (preserves data; can be restarted later): `docker stop $(docker ps -q --filter "name=_supabase_db_")` — and for cleanup `docker rm -f $(docker ps -aq --filter "name=_supabase_<project>_")`.
-   - **Shift this project's ports**: change `[api].port`, `[db].port`, `[studio].port`, `[inbucket].port` in the generated `supabase/config.toml` (Step 2) to a non-overlapping range like 54421–54424. Update `forwardPorts` + `portsAttributes` in `devcontainer.json` Step 5 accordingly. Update the .env.local generation in Step 6 — it auto-uses whatever ports the CLI reports, so it just works.
-   - **Both coexist** with different ports — same as above.
+### 2. Install Supabase CLI + init
 
-   Default recommendation: stop the other stack unless the user has active work there.
-
-## Decisions to make
-
-Ask the user (or infer) if not already clear:
-
-1. **Project ID** — used as the local container prefix (`supabase_db_<project>`). Default: the basename of the workspace folder. Example: if cloned into `my-app/`, project ID = `my-app`. The CLI normalizes this; lowercase + hyphens.
-2. **Frontend env-var naming convention** — default `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` (Vite/React). If the project uses Next.js, switch to `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Use what matches the user's frontend.
-
-## Procedure
-
-### Step 1 — Install the Supabase CLI as a project dev dep
-
-TS:
 ```bash
 npm install -D supabase
+printf 'N\nN\n' | npx supabase init --workdir .   # decline IDE auto-prompts
 ```
 
-Python: install at the system level (uv tool or pipx), since Python projects don't typically vendor JS-based CLIs:
-```bash
-uv tool install --python 3.12 supabase || pipx install supabase
-```
-
-### Step 2 — Initialize Supabase
+Newer CLI may not create `supabase/migrations/` — make sure it exists:
 
 ```bash
-npx supabase init --workdir .
+mkdir -p supabase/migrations
 ```
 
-Decline VS Code/Cursor IDE auto-prompts (`N` when asked). This creates:
-- `supabase/config.toml`
-- `supabase/.gitignore`
-- empty `supabase/migrations/`
-
-### Step 3 — Drop in the foundation migration
-
-Copy the asset file into the project's migrations dir. Use the current UTC timestamp as the migration prefix (format: `YYYYMMDDHHMMSS`). **`mkdir -p` is required** — newer Supabase CLI versions don't create `supabase/migrations/` during `supabase init`.
+### 3. Drop in foundation migration + seed
 
 ```bash
 ts=$(date -u +%Y%m%d%H%M%S)
-mkdir -p supabase/migrations
 cp .claude/skills/setup-supabase-stack/assets/foundation.sql \
    "supabase/migrations/${ts}_foundation.sql"
-```
-
-The foundation migration creates:
-- `app_role` enum (`admin`, `member`)
-- `user_roles`, `user_profiles`, `audit_events` tables
-- `has_role()` / `user_has_role()` helpers (SECURITY DEFINER, pinned search_path)
-- `update_updated_at_column()` trigger function
-- `handle_new_user()` trigger on `auth.users` — auto-provisions role + profile
-- `log_audit_event()` trigger function (attach to any business-data table)
-- RLS policies: users see own role/profile, admins see all; only SECURITY DEFINER funcs write audit_events
-
-### Step 4 — Drop in the seed
-
-```bash
 cp .claude/skills/setup-supabase-stack/assets/seed.sql supabase/seed.sql
 ```
 
-Creates two test users:
+Foundation creates: `app_role` enum (`admin`/`member`), `user_roles`, `user_profiles`, `audit_events`, `audit_redactions` (opt-in column allowlist for secrets/PII), `has_role()`/`user_has_role()` helpers (SECURITY DEFINER, pinned `search_path`, has_role REVOKEd from PUBLIC), `handle_new_user()` auto-provisioning trigger, `log_audit_event()` with redaction, RLS policies on all four tables.
 
-| Email | Password | Role |
-|---|---|---|
-| `admin@localhost.local` | `admin1234` | admin |
-| `member@localhost.local` | `member1234` | member |
+Seed creates: `admin@localhost.local` / `admin1234` + `member@localhost.local` / `member1234`.
 
-**Seed never runs in production** — it only fires on `supabase start`, `supabase db reset`, and preview-branch creation.
+### 4. Patch `.devcontainer/devcontainer.json`
 
-### Step 5 — Patch `.devcontainer/devcontainer.json`
+Merge into the JSONC (not jq — file has `//` comments):
 
-Merge the following into the existing JSON (don't overwrite the file). Use a tool (or careful hand-edit) to:
+- Append `54321, 54322, 54323, 54324` to `forwardPorts`
+- Add to `portsAttributes`:
+  - `"54321"`: Supabase API (silent)
+  - `"54322"`: Supabase Postgres (silent)
+  - `"54323"`: Supabase Studio (notify)
+  - `"54324"`: Mailpit (silent) — auth-email catcher
+- Add `"SUPABASE_ACCESS_TOKEN": "${localEnv:SUPABASE_ACCESS_TOKEN}"` to `remoteEnv`
 
-- Append `54321, 54322, 54323, 54324` to `forwardPorts` if not present (54324 is Mailpit / inbucket — see Step 9; either forward it or set `[inbucket].enabled = false` in `supabase/config.toml` and skip it)
-- Add these entries to `portsAttributes`:
-  ```json
-  "54321": { "label": "Supabase API",     "onAutoForward": "silent" },
-  "54322": { "label": "Supabase Postgres","onAutoForward": "silent" },
-  "54323": { "label": "Supabase Studio",  "onAutoForward": "notify" },
-  "54324": { "label": "Mailpit (auth emails)", "onAutoForward": "silent" }
-  ```
-- Add `"SUPABASE_ACCESS_TOKEN": "${localEnv:SUPABASE_ACCESS_TOKEN}"` to `remoteEnv` (only useful if the user will link to a remote Supabase project; harmless if unset)
-
-Re-validate the file after editing. **`devcontainer.json` is JSONC** (allows `//` comments) so `jq` will fail to parse it. Use `python3` with comment-stripping instead — Python is always available in the dev container:
+Validate after editing (python3 is in the container; jq fails on JSONC):
 
 ```bash
 python3 - <<'PY'
-import json, re, sys
+import json, re
 src = open('.devcontainer/devcontainer.json').read()
-# Strip // line comments (best-effort; doesn't handle // inside strings,
-# which the devcontainer schema doesn't use anyway).
-cleaned = re.sub(r'^\s*//.*$', '', src, flags=re.MULTILINE)
-json.loads(cleaned)
-print('OK: devcontainer.json valid')
+json.loads(re.sub(r'^\s*//.*$', '', src, flags=re.MULTILINE))
+print('OK')
 PY
 ```
 
-### Step 6 — Patch `.devcontainer/post-create.sh`
+### 5. Append supabase-start block to `post-create.sh`
 
-Append the supabase-start block **between** the anchor markers:
-
-```bash
-# === BEGIN stack-specific hooks (appended by setup-*-stack skills) ===
-# ↑ append above this line
-# === END stack-specific hooks ===
-```
-
-The block to append (uses awk to parse status output, robust to CLI flag changes):
+Insert between the stack-specific anchor markers, idempotency-gated by sentinel:
 
 ```bash
+if ! grep -q 'supabase-stack' .devcontainer/post-create.sh; then
+  # Insert this block before the "# === END stack-specific hooks ===" line:
+  cat <<'BLOCK'
+# supabase-stack — start the local stack, write .env.local on rebuild.
 if [ -f supabase/config.toml ]; then
-  echo -e "${cyan}→ Starting local Supabase (first run pulls ~10 images, ~2-3 min)...${reset}"
+  echo -e "${cyan}→ Starting local Supabase (~2-3 min first run)...${reset}"
   npx supabase start
-
-  echo -e "${cyan}→ Writing .env.local from supabase status...${reset}"
   SB_ENV=$(npx supabase status -o env)
   API_URL=$(printf '%s\n' "$SB_ENV" | awk -F'=' '/^API_URL=/{print $2}' | tr -d '"')
   ANON_KEY=$(printf '%s\n' "$SB_ENV" | awk -F'=' '/^ANON_KEY=/{print $2}' | tr -d '"')
-  if [[ -z "$API_URL" || -z "$ANON_KEY" ]]; then
-    echo "  WARN: couldn't parse API_URL/ANON_KEY from supabase status -o env" >&2
-    printf '%s\n' "$SB_ENV" >&2
-  else
-    cat > .env.local <<EOF
-VITE_SUPABASE_URL=$API_URL
-VITE_SUPABASE_PUBLISHABLE_KEY=$ANON_KEY
-EOF
-    echo -e "  ${green}.env.local written.${reset}"
+  if [[ -n "$API_URL" && -n "$ANON_KEY" ]]; then
+    printf 'VITE_SUPABASE_URL=%s\nVITE_SUPABASE_PUBLISHABLE_KEY=%s\n' "$API_URL" "$ANON_KEY" > .env.local
   fi
+fi
+BLOCK
 fi
 ```
 
-If the project is Next.js (decision in pre-flight), use `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in the .env.local block instead.
+(For Next.js projects use `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` instead.)
 
-Use `sed` or careful insertion to place this block before the `# === END stack-specific hooks ===` line. Verify the file still has both anchor markers afterward.
-
-### Step 7 — Add Supabase entries to `.gitignore`
-
-If not already present, append:
+### 6. Append to `.gitignore`
 
 ```
 # Supabase local state
@@ -187,61 +125,28 @@ supabase/.temp/
 supabase/.branches/
 ```
 
-(The baseline `.gitignore` should already include `.env.local`.)
-
-### Step 8 — Generate the typed Supabase types (TS only)
-
-Add this script to `package.json`:
+### 7. Add `db:types` script to `package.json`
 
 ```json
-"scripts": {
-  "db:types": "npx supabase gen types typescript --local > src/integrations/supabase/types.ts"
-}
+{ "scripts": { "db:types": "npx supabase gen types typescript --local > src/integrations/supabase/types.ts" } }
 ```
 
-(Run it after Supabase has actually started in step 9; not before, since it queries the local DB.)
+Run it after rebuild when the local DB is up.
 
-### Step 9 — Prompt the user to rebuild the container
+### 8. Hand-off message
 
-Tell the user:
-
-> "Supabase wired into the project. The devcontainer now forwards Supabase's ports and `post-create.sh` will `supabase start` on every container rebuild.
+> "Supabase wired. Rebuild the dev container (F1 → Dev Containers: Rebuild Container). First rebuild pulls ~10 images. After it's up:
+> - http://localhost:54321 — API
+> - http://localhost:54323 — Studio
+> - http://localhost:54324 — Mailpit (catches auth emails — set `[inbucket].enabled = false` in `supabase/config.toml` to disable)
+> - `.env.local` auto-written
 >
-> **Rebuild the container** now (`F1` → *Dev Containers: Rebuild Container*) so the changes take effect. First rebuild will pull ~10 Docker images (~2-3 min).
->
-> After the rebuild completes, you'll have:
-> - http://localhost:54321 — Supabase API (kong)
-> - http://localhost:54322 — Postgres
-> - http://localhost:54323 — Supabase Studio (DB browser)
-> - http://localhost:54324 — Mailpit (catches outbound emails for password-reset / magic-link testing — Supabase default; harmless if unused)
-> - `.env.local` auto-generated with the API URL + anon key
->
-> Test users seeded in `supabase/seed.sql`:
-> - `admin@localhost.local` / `admin1234` (admin)
-> - `member@localhost.local` / `member1234` (member)
->
-> If you don't need Mailpit, set `[inbucket].enabled = false` in `supabase/config.toml` and drop port 54324 from the devcontainer's `forwardPorts`."
+> Test users: `admin@localhost.local` / `admin1234`, `member@localhost.local` / `member1234`."
 
-## What you've added
+## Constraints
 
-```
-supabase/
-├── config.toml                              (from supabase init)
-├── .gitignore                               (from supabase init)
-├── seed.sql                                 (from this skill)
-└── migrations/
-    └── <timestamp>_foundation.sql           (from this skill)
-
-package.json                                 (← scripts.db:types added; supabase devDep added)
-.gitignore                                   (← supabase/.temp + supabase/.branches added)
-.devcontainer/devcontainer.json              (← Supabase ports + SUPABASE_ACCESS_TOKEN added)
-.devcontainer/post-create.sh                 (← supabase start block appended between anchors)
-```
-
-## What NOT to do
-
-- **Don't modify the foundation migration after applying** to a project that's been shared. Migrations are immutable once any teammate has applied them; add a new migration instead.
-- **Don't disable RLS** on any new tables you add later. The foundation's default-deny stance is non-negotiable.
-- **Don't INSERT into `audit_events`** from app code. The table has no INSERT policy by design — only the `log_audit_event()` trigger function (SECURITY DEFINER) is allowed to write.
-- **Don't put the Supabase start logic outside the anchor markers** in post-create.sh. Other stack skills append between the same markers; respecting the contract keeps them composable.
-- **Don't use the service-role key in client code**. The frontend only ever uses the anon key (`VITE_SUPABASE_PUBLISHABLE_KEY`); the service-role key is for server-only contexts.
+- Don't modify the foundation migration after it's been applied anywhere. Add a new migration instead.
+- Don't disable RLS on tables you add later. The default-deny stance is non-negotiable.
+- Don't INSERT into `audit_events` from app code — only the `log_audit_event()` trigger writes there.
+- Don't validate `devcontainer.json` with `jq` — it's JSONC. Use the `python3` snippet in Step 4.
+- Don't use the service-role key in client code. Frontend uses anon key only.

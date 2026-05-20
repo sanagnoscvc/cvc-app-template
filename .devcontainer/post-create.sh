@@ -26,6 +26,16 @@ fi
 # === Universal harness tools ===
 # Installed in every CVC app dev container regardless of stack.
 
+# Claude Code CLI — the `claude` command in the integrated terminal.
+# The Anthropic.claude-code VS Code extension is installed via
+# devcontainer.json's customizations.vscode.extensions, but the extension
+# doesn't ship the CLI binary. Install globally so `claude` is on PATH
+# inside the container.
+if ! command -v claude >/dev/null 2>&1; then
+  echo -e "${cyan}→ Installing Claude Code CLI (@anthropic-ai/claude-code)...${reset}"
+  sudo npm install -g @anthropic-ai/claude-code
+fi
+
 # git-ai: tracks AI-generated code attribution (which agent + prompt produced
 # each line). Survives rebases/merges via Git Notes. Local-first by default
 # — no telemetry leaves the container without explicit team-cloud config.

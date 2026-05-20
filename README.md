@@ -8,7 +8,7 @@ A Claude-driven starting point for building internal-tool apps at CVC. Clone thi
 
 The base ships only the rules and the universal tools; Claude picks the language-specific tooling at bootstrap time and patches it into the harness. Below is what a fresh **React + Supabase** project actually contains after all three skills run.
 
-### Pre-commit pipeline (4 gates, wired by `setup-ts-flavor`)
+### Pre-commit pipeline (5 gates, wired by `setup-ts-flavor`)
 
 | Gate | Tool | Version | Scope |
 |---|---|---|---|
@@ -17,6 +17,7 @@ The base ships only the rules and the universal tools; Claude picks the language
 | Lint + complexity | `eslint` + `eslint-plugin-sonarjs` + `eslint-plugin-import` | `^9` pinned | `max-lines: 300`, `max-lines-per-function: 60`, `complexity: 12`, `max-depth: 4`, `max-statements: 25`, `sonarjs/cognitive-complexity: 15`, `no-duplicated-branches`, `no-identical-functions`, `import/max-dependencies: 25`, `import/no-cycle: warn` |
 | Format | `prettier` | `^3` | `.json`, `.md`, `.yaml`, `.css`, `.html` files |
 | Dep vulns | `osv-scanner --lockfile` | v1.9.2 pinned (Go binary) | `package-lock.json` against the OSV DB |
+| **Coverage** | `vitest --coverage` + `scripts/check-staged-coverage.mjs` | vitest `^3` + custom | **Per-file thresholds on staged `.ts/.tsx` source files: 75% statements/functions/lines, 60% branches.** Runs once per commit (only if source TS is staged). Bootstrap-friendly: if no `coverage/` report yet, gate skips with a hint. Bypass: `STAGED_COVERAGE_SKIP=1 git commit ...` |
 | Patterns audit | `scripts/check-patterns.sh` | custom | **Refuses commit until Claude has audited the staged diff via `/check-patterns`.** Stamp is sha256-bound to the staged diff — re-staging or `lint-staged --fix` mutations invalidate it. |
 
 Orchestrated by `husky` + `lint-staged@^16` (Node 22.16 engine-compat).

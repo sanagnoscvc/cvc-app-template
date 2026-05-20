@@ -8,17 +8,6 @@ A Claude-driven starting point for building internal-tool apps at CVC. Clone thi
 
 The base ships only the rules and the universal tools; Claude picks the language-specific tooling at bootstrap time and patches it into the harness. Below is what a fresh **React + Supabase** project actually contains after all three skills run.
 
-### Dev environment
-
-| What | Detail |
-|---|---|
-| Base image | `mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm` (Node 22.16) |
-| Features | `common-utils:2` (zsh + Oh My Zsh), `git:1` (latest), `github-cli:1` (`gh`), `docker-outside-of-docker:1` (host docker socket — DooD) |
-| Network | `--network=host` so localhost in the container reaches Supabase's host-published ports |
-| Workspace mount | `${localWorkspaceFolder}` → identical path in container (required for DooD bind-mounts back into sibling containers) |
-| User | `node` (UID 1000) — matches typical host user |
-| Cross-platform | Validated on Docker Desktop for Mac (arm64) + Windows (WSL2). JS-debug auto-attach disabled to avoid `bootloader.js` crashes across rebuilds. |
-
 ### Pre-commit pipeline (4 gates, wired by `setup-ts-flavor`)
 
 | Gate | Tool | Version | Scope |
@@ -74,6 +63,17 @@ Orchestrated by `husky` + `lint-staged@^16` (Node 22.16 engine-compat).
 - `.prettierrc`: `{ singleQuote: true, trailingComma: "all", printWidth: 100 }` — required, or default prettier double-quotes break the first commit.
 - `.prettierignore`: skips JSONC files (`devcontainer.json`, `tsconfig*.json`) and `*.toml` — prettier 3.x can't parse either.
 - Two anchor blocks in `post-create.sh` (`flavor-tooling hooks` + `stack-specific hooks`) define where skills append. Composable across multiple skills.
+
+### Dev environment (the substrate)
+
+| What | Detail |
+|---|---|
+| Base image | `mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm` (Node 22.16) |
+| Features | `common-utils:2` (zsh + Oh My Zsh), `git:1` (latest), `github-cli:1` (`gh`), `docker-outside-of-docker:1` (host docker socket — DooD) |
+| Network | `--network=host` so localhost in the container reaches Supabase's host-published ports |
+| Workspace mount | `${localWorkspaceFolder}` → identical path in container (required for DooD bind-mounts back into sibling containers) |
+| User | `node` (UID 1000) — matches typical host user |
+| Cross-platform | Validated on Docker Desktop for Mac (arm64) + Windows (WSL2). JS-debug auto-attach disabled to avoid `bootloader.js` crashes across rebuilds. |
 
 What does **not** ship out of the box: framework code, `package.json`, `pyproject.toml`, `.pre-commit-config.yaml`. The harness is the contract; tooling is selected at bootstrap.
 

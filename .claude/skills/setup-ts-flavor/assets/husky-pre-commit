@@ -14,5 +14,15 @@ gitleaks protect --staged --no-banner --verbose
 # 3. Language-specific lint + formatting + lockfile vuln scan.
 npx lint-staged
 
-# 4. Pattern audit gate — hash-bound to staged diff after lint-staged.
+# 4. Coverage gate — only if .ts/.tsx files outside test/spec are staged.
+#    Runs `npm run test:coverage` once per commit (not per file) then enforces
+#    per-file thresholds via scripts/check-staged-coverage.mjs.
+#    Escape hatch: STAGED_COVERAGE_SKIP=1 git commit ...
+if git diff --cached --name-only | grep -qE '^.*\.(ts|tsx)$' \
+   && ! git diff --cached --name-only | grep -qE '^.*\.(test|spec)\.(ts|tsx)$'; then
+  npm run test:coverage --silent || true   # generate report; non-fatal if no tests yet
+  node scripts/check-staged-coverage.mjs
+fi
+
+# 5. Pattern audit gate — hash-bound to staged diff after lint-staged.
 bash scripts/check-patterns.sh

@@ -12,6 +12,8 @@ description: |
 
 Run **after** the framework scaffold (`setup-vite-react-stack` etc.) so `package.json` reflects the project's real deps. This skill copies canonical configs from `assets/`, installs deps, and patches `.devcontainer/post-create.sh`.
 
+The shipped `.husky/pre-commit` has **5 gates** in order: hygiene → secrets → lint-staged (lint+format+lockfile) → **coverage** → patterns audit. The coverage gate runs `npm run test:coverage` once per commit (only when source `.ts/.tsx` is staged) and verifies per-file thresholds via `scripts/check-staged-coverage.mjs` (75% statements/functions/lines, 60% branches). Escape hatch for legitimate no-test-yet commits: `STAGED_COVERAGE_SKIP=1 git commit ...`.
+
 ## Steps
 
 ### 1. Pre-flight

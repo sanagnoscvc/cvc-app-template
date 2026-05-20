@@ -38,6 +38,15 @@ repos:
 
   - repo: local
     hooks:
+      - id: check-staged-coverage
+        name: Per-file coverage threshold
+        entry: bash -c 'uv run pytest --cov-report=json:coverage/coverage-summary.json && python3 scripts/check-staged-coverage.py'
+        language: system
+        pass_filenames: false
+        files: \.py$
+        exclude: ^tests/
+        stages: [pre-commit]
+
       - id: check-patterns
         name: Pattern & fallback audit gate
         entry: bash scripts/check-patterns.sh

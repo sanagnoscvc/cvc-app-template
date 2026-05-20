@@ -11,6 +11,8 @@ description: |
 
 Run **after** a framework scaffold (FastAPI, FastMCP, etc.) so `pyproject.toml` exists. Canonical configs live in `assets/`; this skill copies them.
 
+The shipped `.pre-commit-config.yaml` enforces the same 5-gate contract as the TS flavor: hygiene (pre-commit-hooks) → secrets (gitleaks) → dep vulns (osv-scanner) → ruff lint+format + mypy → **per-file coverage** (`scripts/check-staged-coverage.py` reading pytest-cov's JSON output) → patterns audit. The coverage gate enforces ≥75% per-file overall and ≥60% branch coverage when `--cov-branch` is enabled. Escape hatch: `STAGED_COVERAGE_SKIP=1 git commit ...`.
+
 > **Status: not yet validated end-to-end.** The TS flavor has seen four test runs and is stable; this Python equivalent is still theoretical. Surface unexpected friction.
 
 ## Steps

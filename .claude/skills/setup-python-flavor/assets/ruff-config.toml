@@ -40,5 +40,11 @@ warn_return_any = true
 warn_unused_configs = true
 
 [tool.pytest.ini_options]
-addopts = "--cov=src --cov-report=term-missing --cov-fail-under=75"
+# --cov-report=json: emit coverage/coverage-summary.json so the per-file
+# staged-coverage gate (scripts/check-staged-coverage.py) can enforce
+# thresholds per file. Term-missing kept for dev ergonomics. The
+# aggregate --cov-fail-under is removed in favor of per-file gating —
+# stricter and more precise (a clean file shouldn't be punished because
+# another is uncovered).
+addopts = "--cov=src --cov-branch --cov-report=term-missing --cov-report=json:coverage/coverage-summary.json"
 testpaths = ["tests"]

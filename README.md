@@ -6,19 +6,76 @@ A Claude-driven starting point for building internal-tool apps at CVC. Clone thi
 
 ## What's in v0.5
 
-A **stack-agnostic Claude harness** + a small set of language / stack bootstrap skills. Cloning gets you:
+The base ships only the rules and the universal tools; Claude picks the language-specific tooling at bootstrap time and patches it into the harness. Below is what a fresh **React + Supabase** project actually contains after all three skills run.
 
-- **Dev container** (`.devcontainer/`) — Reopen in Container in VS Code and you get Node 22, gh CLI, zsh, the Docker socket (DooD), `--network=host` for Supabase compatibility, and a path-aligned workspace mount. Works on Mac and Windows Docker Desktop. Stack-agnostic: post-create only installs npm deps and starts Supabase if the workspace already has them.
-- **AI-code attribution** ([`git-ai`](https://usegitai.com)) — installed by post-create. Auto-tags each commit with the AI agent + prompt that produced each line; survives rebases/merges via Git Notes. Local-first; no telemetry leaves the container. Use `/who-wrote-this <file>` from Claude Code, or `git ai blame <file>` directly. Useful for PR review (_"this PR is 80% AI — extra eyes"_) and post-hoc bug audits.
-- **The `check-patterns` Claude skill** — encoded review pass Claude runs before each commit to flag duplicated logic and defensive shims
-- **The `check-patterns.sh` gate script** — blocks commits until the audit has run (paired with whatever pre-commit framework Claude wires up for your stack)
-- **Flavor bootstrap skills** — `setup-ts-flavor` and `setup-python-flavor` encode the deterministic install + config steps for each language family, so Claude doesn't re-derive them every time
-- **Stack bootstrap skills** — modular, per-stack additions (`setup-supabase-stack` is the first). When invoked, a stack skill writes its own files, patches `devcontainer.json` + `post-create.sh` between the anchor comments, adds its deps, and prompts for a container rebuild. Multiple stack skills compose
-- **Claude GitHub Action** (`.github/workflows/claude.yml`) — `@claude` in any issue or PR comment runs Claude on a CI runner: it commits to a `claude/...` branch and opens a PR back
-- **`CLAUDE.md`** — Claude's constitution for working in CVC apps. Defines the **hooks contract** (what every commit must be gated on) and points Claude at the right flavor skill per stack
-- **A multi-language `.gitignore`** baseline
+### Dev environment
 
-No `package.json`, no `pyproject.toml`, no `.pre-commit-config.yaml`. The harness is _the rules_; Claude picks the _tooling_ at bootstrap time to match your stack.
+| What | Detail |
+|---|---|
+| Base image | `mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm` (Node 22.16) |
+| Features | `common-utils:2` (zsh + Oh My Zsh), `git:1` (latest), `github-cli:1` (`gh`), `docker-outside-of-docker:1` (host docker socket — DooD) |
+| Network | `--network=host` so localhost in the container reaches Supabase's host-published ports |
+| Workspace mount | `${localWorkspaceFolder}` → identical path in container (required for DooD bind-mounts back into sibling containers) |
+| User | `node` (UID 1000) — matches typical host user |
+| Cross-platform | Validated on Docker Desktop for Mac (arm64) + Windows (WSL2). JS-debug auto-attach disabled to avoid `bootloader.js` crashes across rebuilds. |
+
+### Pre-commit pipeline (4 gates, wired by `setup-ts-flavor`)
+
+| Gate | Tool | Version | Scope |
+|---|---|---|---|
+| Hygiene | `git diff --check --cached` | git built-in | Trailing whitespace, mixed tabs/spaces, merge markers across all staged files |
+| Secrets | `gitleaks protect --staged` | v8.21.2 pinned (Go binary) | API keys, tokens, credentials — all staged files |
+| Lint + complexity | `eslint` + `eslint-plugin-sonarjs` + `eslint-plugin-import` | `^9` pinned | `max-lines: 300`, `max-lines-per-function: 60`, `complexity: 12`, `max-depth: 4`, `max-statements: 25`, `sonarjs/cognitive-complexity: 15`, `no-duplicated-branches`, `no-identical-functions`, `import/max-dependencies: 25`, `import/no-cycle: warn` |
+| Format | `prettier` | `^3` | `.json`, `.md`, `.yaml`, `.css`, `.html` files |
+| Dep vulns | `osv-scanner --lockfile` | v1.9.2 pinned (Go binary) | `package-lock.json` against the OSV DB |
+| Patterns audit | `scripts/check-patterns.sh` | custom | **Refuses commit until Claude has audited the staged diff via `/check-patterns`.** Stamp is sha256-bound to the staged diff — re-staging or `lint-staged --fix` mutations invalidate it. |
+
+Orchestrated by `husky` + `lint-staged@^16` (Node 22.16 engine-compat).
+
+### Claude skills
+
+| Skill | Lines | Purpose |
+|---|---|---|
+| `check-patterns` | 79 | Pre-commit audit for duplicated logic + unnecessary fallbacks. The hash-bound gate above is its enforcement arm. |
+| `setup-ts-flavor` | 147 | Installs the 4-gate pipeline for TS/JS. Detects Vite+React and uses the React-aware ESLint config when present. |
+| `setup-python-flavor` | 77 | Same contract for Python via `pre-commit` framework + ruff + mypy + pytest+coverage. *Not yet validated end-to-end.* |
+| `setup-vite-react-stack` | 137 | Scaffolds Vite + React + TS, port 8080, `@` alias, SWC plugin, Tailwind v4 via `@tailwindcss/vite`, `react-router-dom`, and the standard Supabase auth glue (`client.ts` + `ProtectedRoute` + `LoginPage` + `Dashboard`). |
+| `setup-supabase-stack` | 152 | `supabase init`, foundation migration + seed (admin/member test users), devcontainer patches for ports 54321–54324 + `supabase start` on rebuild. |
+
+### Attribution + telemetry
+
+| What | Detail |
+|---|---|
+| [`git-ai`](https://usegitai.com) | v1.4.11 pinned (Go binary). Installed by base `post-create.sh` — universal, every CVC app. Auto-attributes each committed line to the AI agent + prompt; persisted via Git Notes; survives rebases / merges / cherry-picks. Local-first SQLite; no telemetry leaves the container without team-cloud opt-in. |
+| `/who-wrote-this <file>` | Claude slash command wrapping `git ai blame`. Useful in PR review (*"this PR is 80% AI — extra eyes"*) and post-hoc bug audits. |
+
+### GitHub integration
+
+| What | Detail |
+|---|---|
+| `.github/workflows/claude.yml` | Claude Code Action — `@claude` in issue body/title/comment or PR review fires Claude on a GitHub Actions runner. Pushes to `claude/...` branch + posts a PR-creation link (or comments for question-shaped tasks). Default auth via `ANTHROPIC_API_KEY` secret; OAuth (Pro/Max subscription quota) supported as the commented alternative. |
+
+### Foundation database schema (`setup-supabase-stack`)
+
+| Object | Purpose |
+|---|---|
+| `app_role` enum | `admin` / `member` |
+| `user_roles` | FK to `auth.users`; one role per user |
+| `user_profiles` | FK to `auth.users`; `display_name`, auto-updated `updated_at` |
+| `audit_events` | Append-only audit log; before/after JSONB snapshots; only written by `log_audit_event()` trigger |
+| `audit_redactions` | Opt-in column allowlist — declare `(table_name, column_name, reason)` for secrets/PII; `audit_redact()` strips them before logging |
+| `has_role(uid, role)` | SECURITY DEFINER + pinned `search_path` + **`REVOKE EXECUTE … FROM PUBLIC`**. Internal-only — RLS policies use it; clients can't probe arbitrary users' roles. |
+| `user_has_role(role)` | Public-facing wrapper; always uses `auth.uid()`. The function authenticated clients call. |
+| `handle_new_user()` | Trigger on `auth.users` INSERT — auto-provisions `user_roles` + `user_profiles` in the same transaction |
+| RLS | Default-deny on all four public tables. Self-read on own role/profile; admin sees all; `audit_events` writable only via SECURITY DEFINER trigger. |
+
+### Conventions
+
+- `.prettierrc`: `{ singleQuote: true, trailingComma: "all", printWidth: 100 }` — required, or default prettier double-quotes break the first commit.
+- `.prettierignore`: skips JSONC files (`devcontainer.json`, `tsconfig*.json`) and `*.toml` — prettier 3.x can't parse either.
+- Two anchor blocks in `post-create.sh` (`flavor-tooling hooks` + `stack-specific hooks`) define where skills append. Composable across multiple skills.
+
+What does **not** ship out of the box: framework code, `package.json`, `pyproject.toml`, `.pre-commit-config.yaml`. The harness is the contract; tooling is selected at bootstrap.
 
 ## Quick start
 
